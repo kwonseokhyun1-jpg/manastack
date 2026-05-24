@@ -9,6 +9,7 @@
     "build:standard": "node scripts/build-standard-pool.mjs",
     "build:sets": "node scripts/build-set-catalog.mjs",
     "build:trivia": "node scripts/generate-trivia-bulk.mjs",
+    "prebuild": "npm run build:trivia",
     "predev": "node scripts/ensure-data.mjs",
     "dev:kill": "node scripts/kill-dev-ports.mjs",
     "dev:fresh": "node scripts/kill-dev-ports.mjs && concurrently -n api,web -c blue,green \"npm run dev:server\" \"vite\"",
