@@ -1,11 +1,16 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useGame } from '../context/GameContext'
-import { loadCardDatabase } from '../lib/card-db'
+import { loadMinigamePool } from '../lib/card-db'
 import {
   buildRankGuessPool,
   formatEdhrecRank,
+  modeDescription,
+  modePrompt,
   morePopularCard,
   pickRankPair,
+  poolTooSmallMessage,
+  rankLabel,
+  type RankGameMode,
   type RankPair,
 } from '../lib/edhrec-rank-game'
 import type { CardRecord } from '../types/card'
@@ -21,18 +26,66 @@ import {
 
 type Phase = 'question' | 'revealed'
 
+function RankModeToggle({
+  mode,
+  onSwitch,
+  commanderCount,
+  cardCount,
+}: {
+  mode: RankGameMode
+  onSwitch: (mode: RankGameMode) => void
+  commanderCount: number
+  cardCount: number
+}) {
+  return (
+    <>
+      <div className="mt-4 inline-flex rounded-lg border border-[var(--color-mtg-border)] p-1">
+        <button
+          type="button"
+          onClick={() => onSwitch('commanders')}
+          className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${
+            mode === 'commanders'
+              ? 'bg-[var(--color-mtg-gold)] text-black'
+              : 'text-[var(--color-mtg-muted)] hover:text-white'
+          }`}
+        >
+          Commanders
+        </button>
+        <button
+          type="button"
+          onClick={() => onSwitch('cards')}
+          className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${
+            mode === 'cards'
+              ? 'bg-[var(--color-mtg-gold)] text-black'
+              : 'text-[var(--color-mtg-muted)] hover:text-white'
+          }`}
+        >
+          Cards
+        </button>
+      </div>
+      <p className="mt-2 text-xs text-[var(--color-mtg-muted)]">
+        {mode === 'commanders'
+          ? `EDHREC commander ranks · ${commanderCount.toLocaleString()} commanders`
+          : `EDHREC staple ranks · ${cardCount.toLocaleString()} cards`}
+      </p>
+    </>
+  )
+}
+
 function CardChoice({
   card,
   side,
   disabled,
   onPick,
   highlight,
+  rankPrefix,
 }: {
   card: RankPair['left']
   side: 'left' | 'right'
   disabled: boolean
   onPick: (side: 'left' | 'right') => void
   highlight?: 'correct' | 'wrong' | 'dim'
+  rankPrefix: string
 }) {
   const image = getCardImage(card)
   let style =
@@ -61,7 +114,7 @@ function CardChoice({
         <p className="line-clamp-2 text-sm font-semibold text-white">{card.name}</p>
         {highlight && highlight !== 'dim' && (
           <p className="mt-1 text-xs text-[var(--color-mtg-muted)]">
-            EDHREC {formatEdhrecRank(card.edhrec_rank)}
+            {rankPrefix} {formatEdhrecRank(card.edhrec_rank)}
           </p>
         )}
       </div>
@@ -72,7 +125,8 @@ function CardChoice({
 export function EdhrecRankGame() {
   const { awardMinigameMana, minigameManaRemainingToday } = useGame()
   const manaRemaining = minigameManaRemainingToday('edhrec-rank')
-  const [pool, setPool] = useState<CardRecord[]>([])
+  const [allCards, setAllCards] = useState<CardRecord[]>([])
+  const [mode, setMode] = useState<RankGameMode>('cards')
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [pair, setPair] = useState<RankPair | null>(null)
@@ -83,12 +137,20 @@ export function EdhrecRankGame() {
   const [justEarnedMana, setJustEarnedMana] = useState(false)
   const [atDailyCap, setAtDailyCap] = useState(false)
 
+  const commanderPool = useMemo(
+    () => buildRankGuessPool(allCards, 'commanders'),
+    [allCards],
+  )
+  const cardPool = useMemo(() => buildRankGuessPool(allCards, 'cards'), [allCards])
+  const pool = mode === 'commanders' ? commanderPool : cardPool
+  const rankPrefix = rankLabel(mode)
+
   useEffect(() => {
     let cancelled = false
-    loadCardDatabase()
-      .then((db) => {
+    loadMinigamePool()
+      .then((cards) => {
         if (cancelled) return
-        setPool(buildRankGuessPool(db.cards))
+        setAllCards(cards)
         setLoading(false)
       })
       .catch(() => {
@@ -102,10 +164,22 @@ export function EdhrecRankGame() {
   }, [])
 
   useEffect(() => {
-    if (!loading && pool.length >= 2 && !pair) {
+    if (!loading && pool.length >= 2) {
       setPair(pickRankPair(pool))
+      setPhase('question')
+      setPicked(null)
+      setJustEarnedMana(false)
+      setAtDailyCap(false)
+    } else {
+      setPair(null)
     }
-  }, [loading, pool, pair])
+  }, [loading, pool, mode])
+
+  const handleModeSwitch = useCallback((next: RankGameMode) => {
+    setMode(next)
+    setSessionCorrect(0)
+    setSessionWrong(0)
+  }, [])
 
   const advanceRound = useCallback(() => {
     if (pool.length < 2) return
@@ -150,31 +224,9 @@ export function EdhrecRankGame() {
 
   if (loading) return <MinigameLoading />
   if (loadError) return <MinigameError message={loadError} />
-  if (pool.length < 2) {
-    return <MinigameError message="Not enough ranked commanders in the database." />
+  if (commanderPool.length < 2 && cardPool.length < 2) {
+    return <MinigameError message="Not enough ranked cards in the database." />
   }
-  if (!pair) return <MinigameLoading />
-
-  const winner = morePopularCard(pair.left, pair.right)
-  const isCorrect = picked != null && (picked === 'left' ? pair.left : pair.right).id === winner.id
-  const manaEarnedToday = MINIGAME_DAILY_MANA_CAP - manaRemaining
-
-  const leftHighlight =
-    phase === 'revealed'
-      ? pair.left.id === winner.id
-        ? 'correct'
-        : picked === 'left'
-          ? 'wrong'
-          : 'dim'
-      : undefined
-  const rightHighlight =
-    phase === 'revealed'
-      ? pair.right.id === winner.id
-        ? 'correct'
-        : picked === 'right'
-          ? 'wrong'
-          : 'dim'
-      : undefined
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-6">
@@ -182,96 +234,153 @@ export function EdhrecRankGame() {
         <h2 className="font-[family-name:var(--font-display)] text-2xl font-bold text-[var(--color-mtg-gold)]">
           Higher/Lower
         </h2>
-        <p className="mt-1 text-sm text-[var(--color-mtg-muted)]">
-          Which commander is more popular? Higher rank wins.
-        </p>
+        <p className="mt-1 text-sm text-[var(--color-mtg-muted)]">{modeDescription(mode)}</p>
         <p className="mt-1 text-sm text-[var(--color-mtg-muted)]">
           +{RANK_GUESS_MANA_PER_CORRECT} mana per correct answer, up to {MINIGAME_DAILY_MANA_CAP}{' '}
           mana per day for this game.
         </p>
+        <RankModeToggle
+          mode={mode}
+          onSwitch={handleModeSwitch}
+          commanderCount={commanderPool.length}
+          cardCount={cardPool.length}
+        />
       </div>
 
-      <div className="grid grid-cols-3 gap-3 text-center text-sm">
-        <div className="rounded-lg border border-[var(--color-mtg-border)] bg-[var(--color-mtg-panel)] p-3">
-          <p className="text-xs uppercase tracking-wide text-[var(--color-mtg-muted)]">Correct</p>
-          <p className="text-xl font-bold text-green-400">{sessionCorrect}</p>
-        </div>
-        <div className="rounded-lg border border-[var(--color-mtg-border)] bg-[var(--color-mtg-panel)] p-3">
-          <p className="text-xs uppercase tracking-wide text-[var(--color-mtg-muted)]">Wrong</p>
-          <p className="text-xl font-bold text-red-400">{sessionWrong}</p>
-        </div>
-        <div
-          className={`rounded-lg border bg-[var(--color-mtg-panel)] p-3 transition ${
-            manaRemaining <= 0
-              ? 'border-[var(--color-mtg-border)] opacity-80'
-              : 'border-[var(--color-mana-u)]/40'
-          }`}
-        >
-          <p className="text-xs uppercase tracking-wide text-[var(--color-mtg-muted)]">
-            Mana today
-          </p>
-          <p className="text-xl font-bold text-[var(--color-mana-u)]">
-            {manaEarnedToday}/{MINIGAME_DAILY_MANA_CAP}
-          </p>
-        </div>
-      </div>
+      {pool.length < 2 ? (
+        <MinigameError message={poolTooSmallMessage(mode)} />
+      ) : pair ? (
+        <>
+          <div className="grid grid-cols-3 gap-3 text-center text-sm">
+            <div className="rounded-lg border border-[var(--color-mtg-border)] bg-[var(--color-mtg-panel)] p-3">
+              <p className="text-xs uppercase tracking-wide text-[var(--color-mtg-muted)]">Correct</p>
+              <p className="text-xl font-bold text-green-400">{sessionCorrect}</p>
+            </div>
+            <div className="rounded-lg border border-[var(--color-mtg-border)] bg-[var(--color-mtg-panel)] p-3">
+              <p className="text-xs uppercase tracking-wide text-[var(--color-mtg-muted)]">Wrong</p>
+              <p className="text-xl font-bold text-red-400">{sessionWrong}</p>
+            </div>
+            <div
+              className={`rounded-lg border bg-[var(--color-mtg-panel)] p-3 transition ${
+                manaRemaining <= 0
+                  ? 'border-[var(--color-mtg-border)] opacity-80'
+                  : 'border-[var(--color-mana-u)]/40'
+              }`}
+            >
+              <p className="text-xs uppercase tracking-wide text-[var(--color-mtg-muted)]">
+                Mana today
+              </p>
+              <p className="text-xl font-bold text-[var(--color-mana-u)]">
+                {MINIGAME_DAILY_MANA_CAP - manaRemaining}/{MINIGAME_DAILY_MANA_CAP}
+              </p>
+            </div>
+          </div>
 
-      {manaRemaining <= 0 && (
-        <p className="rounded-lg border border-[var(--color-mtg-border)] bg-[var(--color-mtg-panel)] px-4 py-3 text-center text-sm text-[var(--color-mtg-muted)]">
-          Daily mana cap reached — keep playing for practice. Resets tomorrow.
-        </p>
+          {manaRemaining <= 0 && (
+            <p className="rounded-lg border border-[var(--color-mtg-border)] bg-[var(--color-mtg-panel)] px-4 py-3 text-center text-sm text-[var(--color-mtg-muted)]">
+              Daily mana cap reached — keep playing for practice. Resets tomorrow.
+            </p>
+          )}
+
+          <p className="text-center text-sm font-medium text-white">
+            {phase === 'question' ? modePrompt(mode) : 'Rank reveal'}
+          </p>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <CardChoice
+              card={pair.left}
+              side="left"
+              disabled={phase === 'revealed'}
+              onPick={handlePick}
+              rankPrefix={rankPrefix}
+              highlight={
+                phase === 'revealed'
+                  ? pair.left.id === morePopularCard(pair.left, pair.right).id
+                    ? 'correct'
+                    : picked === 'left'
+                      ? 'wrong'
+                      : 'dim'
+                  : undefined
+              }
+            />
+            <CardChoice
+              card={pair.right}
+              side="right"
+              disabled={phase === 'revealed'}
+              onPick={handlePick}
+              rankPrefix={rankPrefix}
+              highlight={
+                phase === 'revealed'
+                  ? pair.right.id === morePopularCard(pair.left, pair.right).id
+                    ? 'correct'
+                    : picked === 'right'
+                      ? 'wrong'
+                      : 'dim'
+                  : undefined
+              }
+            />
+          </div>
+
+          {phase === 'revealed' && (
+            <RankReveal
+              pair={pair}
+              rankPrefix={rankPrefix}
+              picked={picked}
+              justEarnedMana={justEarnedMana}
+              atDailyCap={atDailyCap}
+              onNext={advanceRound}
+            />
+          )}
+        </>
+      ) : (
+        <MinigameLoading />
       )}
+    </div>
+  )
+}
 
-      <p className="text-center text-sm font-medium text-white">
-        {phase === 'question'
-          ? 'Tap the commander with the higher rank'
-          : 'Rank reveal'}
+function RankReveal({
+  pair,
+  rankPrefix,
+  picked,
+  justEarnedMana,
+  atDailyCap,
+  onNext,
+}: {
+  pair: RankPair
+  rankPrefix: string
+  picked: 'left' | 'right' | null
+  justEarnedMana: boolean
+  atDailyCap: boolean
+  onNext: () => void
+}) {
+  const winner = morePopularCard(pair.left, pair.right)
+  const isCorrect =
+    picked != null && (picked === 'left' ? pair.left : pair.right).id === winner.id
+
+  return (
+    <div
+      className={`rounded-lg border p-4 ${
+        isCorrect ? 'border-green-500/40 bg-green-500/10' : 'border-red-500/40 bg-red-500/10'
+      }`}
+    >
+      <p className={`font-semibold ${isCorrect ? 'text-green-300' : 'text-red-300'}`}>
+        {isCorrect ? 'Correct!' : 'Incorrect'}
+        {isCorrect && justEarnedMana && ` — +${RANK_GUESS_MANA_PER_CORRECT} mana!`}
+        {isCorrect && atDailyCap && ' — daily cap reached, no mana earned.'}
       </p>
-
-      <div className="grid gap-4 sm:grid-cols-2">
-        <CardChoice
-          card={pair.left}
-          side="left"
-          disabled={phase === 'revealed'}
-          onPick={handlePick}
-          highlight={leftHighlight}
-        />
-        <CardChoice
-          card={pair.right}
-          side="right"
-          disabled={phase === 'revealed'}
-          onPick={handlePick}
-          highlight={rightHighlight}
-        />
-      </div>
-
-      {phase === 'revealed' && (
-        <div
-          className={`rounded-lg border p-4 ${
-            isCorrect
-              ? 'border-green-500/40 bg-green-500/10'
-              : 'border-red-500/40 bg-red-500/10'
-          }`}
-        >
-          <p className={`font-semibold ${isCorrect ? 'text-green-300' : 'text-red-300'}`}>
-            {isCorrect ? 'Correct!' : 'Incorrect'}
-            {isCorrect && justEarnedMana && ` — +${RANK_GUESS_MANA_PER_CORRECT} mana!`}
-            {isCorrect && atDailyCap && ' — daily cap reached, no mana earned.'}
-          </p>
-          <p className="mt-2 text-sm text-[var(--color-mtg-muted)]">
-            {pair.left.name} ({formatEdhrecRank(pair.left.edhrec_rank)}) vs {pair.right.name} (
-            {formatEdhrecRank(pair.right.edhrec_rank)}). More popular:{' '}
-            <span className="text-white">{winner.name}</span>.
-          </p>
-          <button
-            type="button"
-            onClick={advanceRound}
-            className="mt-4 w-full rounded-lg bg-[var(--color-mtg-gold)] py-2.5 text-sm font-semibold text-black transition hover:brightness-110"
-          >
-            Next round
-          </button>
-        </div>
-      )}
+      <p className="mt-2 text-sm text-[var(--color-mtg-muted)]">
+        {pair.left.name} ({rankPrefix} {formatEdhrecRank(pair.left.edhrec_rank)}) vs {pair.right.name}{' '}
+        ({rankPrefix} {formatEdhrecRank(pair.right.edhrec_rank)}). More popular:{' '}
+        <span className="text-white">{winner.name}</span>.
+      </p>
+      <button
+        type="button"
+        onClick={onNext}
+        className="mt-4 w-full rounded-lg bg-[var(--color-mtg-gold)] py-2.5 text-sm font-semibold text-black transition hover:brightness-110"
+      >
+        Next round
+      </button>
     </div>
   )
 }

@@ -1,5 +1,7 @@
 import type { CardRecord } from '../types/card'
-import { getCardImage } from './card-utils'
+import { getCardImage, isLand } from './card-utils'
+
+export type RankGameMode = 'commanders' | 'cards'
 
 export type RankPair = {
   left: CardRecord
@@ -31,14 +33,13 @@ export function isCommander(card: CardRecord): boolean {
   return false
 }
 
-export function buildRankGuessPool(cards: CardRecord[]): CardRecord[] {
-  return cards.filter(
-    (c) =>
-      isCommander(c) &&
-      c.edhrec_rank != null &&
-      c.edhrec_rank > 0 &&
-      getCardImage(c),
-  )
+export function buildRankGuessPool(cards: CardRecord[], mode: RankGameMode): CardRecord[] {
+  return cards.filter((c) => {
+    if (c.edhrec_rank == null || c.edhrec_rank <= 0) return false
+    if (!getCardImage(c)) return false
+    if (mode === 'commanders') return isCommander(c)
+    return !isCommander(c) && !isLand(c)
+  })
 }
 
 export function morePopularCard(a: CardRecord, b: CardRecord): CardRecord {
@@ -75,4 +76,26 @@ export function pickRankPair(pool: CardRecord[], previous?: RankPair): RankPair 
 export function formatEdhrecRank(rank: number | undefined): string {
   if (rank == null || rank <= 0) return '—'
   return `#${rank.toLocaleString()}`
+}
+
+export function rankLabel(mode: RankGameMode): string {
+  return mode === 'commanders' ? 'EDHREC' : 'EDHREC staple'
+}
+
+export function modePrompt(mode: RankGameMode): string {
+  return mode === 'commanders'
+    ? 'Tap the more popular commander on EDHREC'
+    : 'Tap the more popular staple on EDHREC'
+}
+
+export function modeDescription(mode: RankGameMode): string {
+  return mode === 'commanders'
+    ? 'Which commander is more popular on EDHREC? Lower rank number wins.'
+    : 'Which staple is more popular on EDHREC? Lower rank number wins.'
+}
+
+export function poolTooSmallMessage(mode: RankGameMode): string {
+  return mode === 'commanders'
+    ? 'Not enough ranked commanders in the database.'
+    : 'Not enough ranked cards in the database.'
 }

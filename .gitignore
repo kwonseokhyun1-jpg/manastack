@@ -1,7 +1,8 @@
 node_modules
 dist
 /data
-public/data
+public/data/*
+!public/data/minigame-pool.json
 .env
 .env.local
 *.local

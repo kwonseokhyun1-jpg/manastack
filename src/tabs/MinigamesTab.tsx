@@ -56,7 +56,7 @@ const GAMES = [
   {
     id: 'edhrec-rank' as const,
     title: 'Higher/Lower',
-    description: 'Pick which of two commanders is ranked higher on EDHREC.',
+    description: 'Compare EDHREC ranks — commanders or staple cards.',
   },
 ]
 
