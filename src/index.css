@@ -1,0 +1,144 @@
+@import 'tailwindcss';
+
+@theme {
+  --font-display: 'Cinzel', serif;
+  --font-body: 'Source Sans 3', system-ui, sans-serif;
+  --color-mtg-bg: #0d1117;
+  --color-mtg-panel: #161b22;
+  --color-mtg-border: #30363d;
+  --color-mtg-gold: #c9a227;
+  --color-mtg-gold-dim: #8a7020;
+  --color-mtg-text: #e6edf3;
+  --color-mtg-muted: #8b949e;
+  --color-mana-w: #f8e7b9;
+  --color-mana-u: #0e68ab;
+  --color-mana-b: #150b00;
+  --color-mana-r: #d3202a;
+  --color-mana-g: #00733e;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: var(--font-body);
+  background: radial-gradient(ellipse at top, #1a2332 0%, var(--color-mtg-bg) 55%);
+  color: var(--color-mtg-text);
+}
+
+#root {
+  min-height: 100vh;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-mtg-border);
+  border-radius: 4px;
+}
+
+.foil-shimmer {
+  background: linear-gradient(
+    135deg,
+    rgba(255, 215, 0, 0.15) 0%,
+    rgba(255, 255, 255, 0.25) 25%,
+    rgba(200, 100, 255, 0.15) 50%,
+    rgba(255, 255, 255, 0.25) 75%,
+    rgba(255, 215, 0, 0.15) 100%
+  );
+}
+
+.ultrafoil-border {
+  border-color: transparent;
+  background:
+    linear-gradient(var(--color-mtg-panel), var(--color-mtg-panel)) padding-box,
+    linear-gradient(
+      135deg,
+      #fbbf24,
+      #f472b6,
+      #22d3ee,
+      #a78bfa,
+      #fde047,
+      #f472b6
+    )
+    border-box;
+  animation: ultrafoil-border-spin 4s linear infinite;
+}
+
+.ultrafoil-shimmer {
+  isolation: isolate;
+}
+
+.ultrafoil-shimmer::before {
+  content: '';
+  position: absolute;
+  inset: -40%;
+  z-index: 2;
+  background: conic-gradient(
+    from 0deg,
+    transparent 0deg,
+    rgba(255, 255, 255, 0.55) 40deg,
+    rgba(34, 211, 238, 0.45) 80deg,
+    rgba(244, 114, 182, 0.45) 120deg,
+    rgba(251, 191, 36, 0.5) 160deg,
+    transparent 220deg
+  );
+  animation: ultrafoil-rotate 3.5s linear infinite;
+  pointer-events: none;
+  mix-blend-mode: screen;
+}
+
+.ultrafoil-shimmer::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  background: linear-gradient(
+    115deg,
+    transparent 20%,
+    rgba(255, 255, 255, 0.65) 45%,
+    rgba(167, 139, 250, 0.35) 50%,
+    rgba(255, 255, 255, 0.65) 55%,
+    transparent 80%
+  );
+  background-size: 220% 100%;
+  animation: ultrafoil-sweep 2.8s ease-in-out infinite;
+  pointer-events: none;
+  mix-blend-mode: overlay;
+}
+
+.ultrafoil-art {
+  filter: saturate(1.2) contrast(1.06) brightness(1.05);
+}
+
+@keyframes ultrafoil-rotate {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes ultrafoil-sweep {
+  0%,
+  100% {
+    background-position: 200% 0;
+  }
+  50% {
+    background-position: -200% 0;
+  }
+}
+
+@keyframes ultrafoil-border-spin {
+  to {
+    filter: hue-rotate(360deg);
+  }
+}
+
+.spellify-card {
+  font-variant-ligatures: none;
+}
