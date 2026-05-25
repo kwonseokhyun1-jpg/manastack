@@ -25,3 +25,13 @@ export type TradeOffer = {
   note?: string
   createdAt: number
 }
+
+export type TradeInboxEntry = {
+  offer: TradeOffer
+  trade: TradePost
+}
+
+export type TradeInbox = {
+  incoming: TradeInboxEntry[]
+  outgoing: TradeInboxEntry[]
+}

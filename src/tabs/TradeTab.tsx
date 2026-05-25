@@ -2,9 +2,12 @@ import { useCallback, useEffect, useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useGame } from '../context/GameContext'
 import { CreateTradeModal } from '../components/CreateTradeModal'
+import { TradeInboxPanel } from '../components/TradeInboxPanel'
 import { TradeOfferModal } from '../components/TradeOfferModal'
-import { deleteTrade, fetchTrades } from '../lib/trade-api'
-import type { TradeCardEntry, TradePost } from '../types/trade'
+import { deleteTrade, fetchTradeInbox, fetchTrades } from '../lib/trade-api'
+import type { TradeCardEntry, TradeInbox, TradePost } from '../types/trade'
+
+type TradeView = 'browse' | 'inbox' | 'my-offers'
 
 function formatRelativeTime(ts: number): string {
   const diff = Date.now() - ts
@@ -116,11 +119,15 @@ function TradeCard({
 export function TradeTab() {
   const { user, openAuthModal } = useAuth()
   const { collection } = useGame()
+  const [view, setView] = useState<TradeView>('browse')
   const [query, setQuery] = useState('')
   const [debouncedQuery, setDebouncedQuery] = useState('')
   const [trades, setTrades] = useState<TradePost[]>([])
+  const [inbox, setInbox] = useState<TradeInbox | null>(null)
   const [loading, setLoading] = useState(true)
+  const [inboxLoading, setInboxLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [inboxError, setInboxError] = useState<string | null>(null)
   const [createModalOpen, setCreateModalOpen] = useState(false)
   const [selectedTrade, setSelectedTrade] = useState<TradePost | null>(null)
 
@@ -143,9 +150,38 @@ export function TradeTab() {
     }
   }, [])
 
+  const loadInbox = useCallback(async () => {
+    if (!user) {
+      setInbox(null)
+      setInboxError(null)
+      setInboxLoading(false)
+      return
+    }
+
+    setInboxLoading(true)
+    setInboxError(null)
+    try {
+      const data = await fetchTradeInbox()
+      setInbox(data)
+    } catch (err) {
+      setInboxError(err instanceof Error ? err.message : 'Could not load inbox.')
+      setInbox(null)
+    } finally {
+      setInboxLoading(false)
+    }
+  }, [user])
+
   useEffect(() => {
     void loadTrades(debouncedQuery)
   }, [debouncedQuery, loadTrades])
+
+  useEffect(() => {
+    if (user) {
+      void loadInbox()
+    } else {
+      setInbox(null)
+    }
+  }, [user, loadInbox])
 
   function handlePostClick() {
     if (!user) {
@@ -159,6 +195,22 @@ export function TradeTab() {
     setSelectedTrade(trade)
   }
 
+  function refreshAll() {
+    void loadTrades(debouncedQuery)
+    if (user) void loadInbox()
+  }
+
+  const incomingCount = user ? (inbox?.incoming.length ?? 0) : 0
+  const outgoingCount = user ? (inbox?.outgoing.length ?? 0) : 0
+
+  function openTradeView(nextView: 'inbox' | 'my-offers') {
+    if (!user) {
+      openAuthModal()
+      return
+    }
+    setView(nextView)
+  }
+
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
@@ -167,7 +219,7 @@ export function TradeTab() {
             Trade
           </h2>
           <p className="mt-1 text-sm text-[var(--color-mtg-muted)]">
-            Post cards from your collection, browse listings, and make offers with mana or cards.
+            Browse listings, check your inbox for incoming offers, and track offers you&apos;ve sent.
           </p>
         </div>
         <button
@@ -179,55 +231,107 @@ export function TradeTab() {
         </button>
       </div>
 
-      <label className="block">
-        <span className="sr-only">Search trades</span>
-        <input
-          type="search"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search by card name or username…"
-          className="w-full rounded-lg border border-[var(--color-mtg-border)] bg-[var(--color-mtg-panel)] px-4 py-2.5 text-sm text-white placeholder:text-[var(--color-mtg-muted)] focus:border-[var(--color-mtg-gold)] focus:outline-none"
-        />
-      </label>
-
-      {loading && (
-        <p className="text-center text-sm text-[var(--color-mtg-muted)]">Loading trades…</p>
-      )}
-
-      {error && (
-        <p className="rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-300">
-          {error}
-        </p>
-      )}
-
-      {!loading && !error && trades.length === 0 && (
-        <p className="rounded-lg border border-[var(--color-mtg-border)] bg-[var(--color-mtg-panel)] px-4 py-8 text-center text-sm text-[var(--color-mtg-muted)]">
-          {debouncedQuery
-            ? 'No trades match your search.'
-            : 'No trades posted yet. Be the first to post one!'}
-        </p>
-      )}
-
-      <div className="flex flex-col gap-4">
-        {trades.map((trade) => (
-          <TradeCard
-            key={trade.id}
-            trade={trade}
-            isOwn={user?.id === trade.userId}
-            onOpen={handleOpenTrade}
-            onDelete={(id) => {
-              setTrades((prev) => prev.filter((t) => t.id !== id))
-              if (selectedTrade?.id === id) setSelectedTrade(null)
-            }}
-          />
-        ))}
+      <div className="flex gap-2 rounded-lg border border-[var(--color-mtg-border)] bg-[var(--color-mtg-bg)] p-1">
+        <button
+          type="button"
+          onClick={() => setView('browse')}
+          className={`flex-1 rounded-md px-3 py-2 text-sm font-medium transition ${
+            view === 'browse'
+              ? 'bg-[var(--color-mtg-gold)] text-black'
+              : 'text-[var(--color-mtg-muted)] hover:text-white'
+          }`}
+        >
+          Browse
+        </button>
+        <button
+          type="button"
+          onClick={() => openTradeView('inbox')}
+          className={`flex-1 rounded-md px-3 py-2 text-sm font-medium transition ${
+            view === 'inbox'
+              ? 'bg-[var(--color-mtg-gold)] text-black'
+              : 'text-[var(--color-mtg-muted)] hover:text-white'
+          }`}
+        >
+          Inbox{incomingCount > 0 ? ` (${incomingCount})` : ''}
+        </button>
+        <button
+          type="button"
+          onClick={() => openTradeView('my-offers')}
+          className={`flex-1 rounded-md px-3 py-2 text-sm font-medium transition ${
+            view === 'my-offers'
+              ? 'bg-[var(--color-mtg-gold)] text-black'
+              : 'text-[var(--color-mtg-muted)] hover:text-white'
+          }`}
+        >
+          My offers{outgoingCount > 0 ? ` (${outgoingCount})` : ''}
+        </button>
       </div>
+
+      {view === 'browse' && (
+        <>
+          <label className="block">
+            <span className="sr-only">Search trades</span>
+            <input
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search by card name or username…"
+              className="w-full rounded-lg border border-[var(--color-mtg-border)] bg-[var(--color-mtg-panel)] px-4 py-2.5 text-sm text-white placeholder:text-[var(--color-mtg-muted)] focus:border-[var(--color-mtg-gold)] focus:outline-none"
+            />
+          </label>
+
+          {loading && (
+            <p className="text-center text-sm text-[var(--color-mtg-muted)]">Loading trades…</p>
+          )}
+
+          {error && (
+            <p className="rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+              {error}
+            </p>
+          )}
+
+          {!loading && !error && trades.length === 0 && (
+            <p className="rounded-lg border border-[var(--color-mtg-border)] bg-[var(--color-mtg-panel)] px-4 py-8 text-center text-sm text-[var(--color-mtg-muted)]">
+              {debouncedQuery
+                ? 'No trades match your search.'
+                : 'No trades posted yet. Be the first to post one!'}
+            </p>
+          )}
+
+          <div className="flex flex-col gap-4">
+            {trades.map((trade) => (
+              <TradeCard
+                key={trade.id}
+                trade={trade}
+                isOwn={user?.id === trade.userId}
+                onOpen={handleOpenTrade}
+                onDelete={(id) => {
+                  setTrades((prev) => prev.filter((t) => t.id !== id))
+                  if (selectedTrade?.id === id) setSelectedTrade(null)
+                }}
+              />
+            ))}
+          </div>
+        </>
+      )}
+
+      {view !== 'browse' && (
+        <TradeInboxPanel
+          inbox={inbox}
+          loading={inboxLoading}
+          error={inboxError}
+          loggedIn={Boolean(user)}
+          section={view === 'inbox' ? 'incoming' : 'outgoing'}
+          onLogin={openAuthModal}
+          onOpenTrade={handleOpenTrade}
+        />
+      )}
 
       {createModalOpen && (
         <CreateTradeModal
           collection={collection}
           onClose={() => setCreateModalOpen(false)}
-          onCreated={() => void loadTrades(debouncedQuery)}
+          onCreated={refreshAll}
         />
       )}
 
@@ -236,7 +340,7 @@ export function TradeTab() {
           trade={selectedTrade}
           collection={collection}
           onClose={() => setSelectedTrade(null)}
-          onOfferCreated={() => void loadTrades(debouncedQuery)}
+          onOfferCreated={refreshAll}
         />
       )}
     </div>

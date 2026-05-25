@@ -230,3 +230,86 @@ export async function createTradeOffer(id, tradeId, userId, mana, cardsJson, not
     VALUES (${id}, ${tradeId}, ${userId}, ${mana}, ${cardsJson}, ${note ?? null}, ${Date.now()})
   `
 }
+
+function mapInboxRow(row) {
+  return {
+    offer: mapOfferRow({
+      id: row.offer_id,
+      trade_id: row.trade_id,
+      user_id: row.offer_user_id,
+      mana: row.mana,
+      cards: row.cards,
+      note: row.offer_note,
+      created_at: row.offer_created_at,
+      username: row.offer_username,
+    }),
+    trade: mapTradeRow({
+      id: row.trade_id,
+      user_id: row.trade_user_id,
+      offering: row.offering,
+      wanting: row.wanting,
+      note: row.trade_note,
+      created_at: row.trade_created_at,
+      username: row.trade_username,
+    }),
+  }
+}
+
+export async function getTradeInbox(userId) {
+  await ensureSchema()
+
+  const incomingRows = await sql`
+    SELECT
+      o.id AS offer_id,
+      o.trade_id,
+      o.user_id AS offer_user_id,
+      o.mana,
+      o.cards,
+      o.note AS offer_note,
+      o.created_at AS offer_created_at,
+      ou.username AS offer_username,
+      t.user_id AS trade_user_id,
+      t.offering,
+      t.wanting,
+      t.note AS trade_note,
+      t.created_at AS trade_created_at,
+      tu.username AS trade_username
+    FROM trade_offers o
+    JOIN trades t ON t.id = o.trade_id
+    JOIN users ou ON ou.id = o.user_id
+    JOIN users tu ON tu.id = t.user_id
+    WHERE t.user_id = ${userId}
+    ORDER BY o.created_at DESC
+    LIMIT 100
+  `
+
+  const outgoingRows = await sql`
+    SELECT
+      o.id AS offer_id,
+      o.trade_id,
+      o.user_id AS offer_user_id,
+      o.mana,
+      o.cards,
+      o.note AS offer_note,
+      o.created_at AS offer_created_at,
+      ou.username AS offer_username,
+      t.user_id AS trade_user_id,
+      t.offering,
+      t.wanting,
+      t.note AS trade_note,
+      t.created_at AS trade_created_at,
+      tu.username AS trade_username
+    FROM trade_offers o
+    JOIN trades t ON t.id = o.trade_id
+    JOIN users ou ON ou.id = o.user_id
+    JOIN users tu ON tu.id = t.user_id
+    WHERE o.user_id = ${userId}
+    ORDER BY o.created_at DESC
+    LIMIT 100
+  `
+
+  return {
+    incoming: incomingRows.map(mapInboxRow),
+    outgoing: outgoingRows.map(mapInboxRow),
+  }
+}

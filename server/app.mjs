@@ -204,6 +204,13 @@ app.get('/api/trades', async (req, res) => {
   })
 })
 
+app.get('/api/trades/inbox', authMiddleware, async (req, res) => {
+  await withDb(res, async (db) => {
+    const inbox = await db.getTradeInbox(req.userId)
+    res.json(inbox)
+  })
+})
+
 app.post('/api/trades', authMiddleware, async (req, res) => {
   const offering = normalizeTradeCards(req.body?.offering)
   const note = String(req.body?.note ?? '').trim().slice(0, 500)

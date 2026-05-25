@@ -1,5 +1,5 @@
 import { getStoredToken } from './auth-api'
-import type { TradeCardEntry, TradeOffer, TradePost } from '../types/trade'
+import type { TradeCardEntry, TradeInbox, TradeOffer, TradePost } from '../types/trade'
 
 type TradesResponse = {
   trades: TradePost[]
@@ -55,6 +55,13 @@ export async function fetchTrades(query = ''): Promise<TradePost[]> {
   const suffix = params.toString() ? `?${params.toString()}` : ''
   const data = await apiFetch<TradesResponse>(`/api/trades${suffix}`)
   return data.trades
+}
+
+export async function fetchTradeInbox(): Promise<TradeInbox> {
+  if (!getStoredToken()) {
+    throw new Error('Log in to view your trade inbox.')
+  }
+  return apiFetch<TradeInbox>('/api/trades/inbox')
 }
 
 export async function createTrade(payload: {
