@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { SpellifyCardFace, SpellifyGuessTable } from '../components/SpellifyCard'
 import { SpellifyKeyboard } from '../components/SpellifyKeyboard'
 import { useGame } from '../context/GameContext'
-import { loadCardDatabase } from '../lib/card-db'
+import { loadMinigamePool } from '../lib/card-db'
 import { suggestCardNames } from '../lib/card-name-resolve'
 import { getCardImage } from '../lib/card-utils'
 import { getAllStaples } from '../lib/staples'
@@ -97,12 +97,12 @@ export function SpellifyGame() {
 
   useEffect(() => {
     let cancelled = false
-    loadCardDatabase()
-      .then((db) => {
+    loadMinigamePool()
+      .then((cards) => {
         if (cancelled) return
-        const eligible = buildSpellifyPool(db.cards)
+        const eligible = buildSpellifyPool(cards)
         setAllCards(eligible)
-        setEasyPool(buildSpellifyPool(getAllStaples(db.cards)))
+        setEasyPool(buildSpellifyPool(getAllStaples(cards)))
         setLoading(false)
       })
       .catch(() => {
