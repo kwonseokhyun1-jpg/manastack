@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useGame } from '../context/GameContext'
-import { loadMinigamePool } from '../lib/card-db'
+import { loadCommanderRankPool, loadMinigamePool } from '../lib/card-db'
 import {
-  buildRankGuessPool,
+  buildCardRankPool,
+  buildCommanderRankPool,
   formatEdhrecRank,
   modeDescription,
+  modePoolCaption,
   modePrompt,
   morePopularCard,
   pickRankPair,
@@ -64,9 +66,7 @@ function RankModeToggle({
         </button>
       </div>
       <p className="mt-2 text-xs text-[var(--color-mtg-muted)]">
-        {mode === 'commanders'
-          ? `EDHREC commander ranks · ${commanderCount.toLocaleString()} commanders`
-          : `EDHREC staple ranks · ${cardCount.toLocaleString()} cards`}
+        {modePoolCaption(mode, mode === 'commanders' ? commanderCount : cardCount)}
       </p>
     </>
   )
@@ -126,6 +126,7 @@ export function EdhrecRankGame() {
   const { awardMinigameMana, minigameManaRemainingToday } = useGame()
   const manaRemaining = minigameManaRemainingToday('edhrec-rank')
   const [allCards, setAllCards] = useState<CardRecord[]>([])
+  const [allCommanders, setAllCommanders] = useState<CardRecord[]>([])
   const [mode, setMode] = useState<RankGameMode>('cards')
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -138,19 +139,20 @@ export function EdhrecRankGame() {
   const [atDailyCap, setAtDailyCap] = useState(false)
 
   const commanderPool = useMemo(
-    () => buildRankGuessPool(allCards, 'commanders'),
-    [allCards],
+    () => buildCommanderRankPool(allCommanders),
+    [allCommanders],
   )
-  const cardPool = useMemo(() => buildRankGuessPool(allCards, 'cards'), [allCards])
+  const cardPool = useMemo(() => buildCardRankPool(allCards), [allCards])
   const pool = mode === 'commanders' ? commanderPool : cardPool
   const rankPrefix = rankLabel(mode)
 
   useEffect(() => {
     let cancelled = false
-    loadMinigamePool()
-      .then((cards) => {
+    Promise.all([loadMinigamePool(), loadCommanderRankPool()])
+      .then(([cards, commanders]) => {
         if (cancelled) return
         setAllCards(cards)
+        setAllCommanders(commanders)
         setLoading(false)
       })
       .catch(() => {

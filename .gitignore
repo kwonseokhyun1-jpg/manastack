@@ -3,6 +3,7 @@ dist
 /data
 public/data/*
 !public/data/minigame-pool.json
+!public/data/commanders.json
 .env
 .env.local
 *.local

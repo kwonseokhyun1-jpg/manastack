@@ -33,13 +33,18 @@ export function isCommander(card: CardRecord): boolean {
   return false
 }
 
-export function buildRankGuessPool(cards: CardRecord[], mode: RankGameMode): CardRecord[] {
-  return cards.filter((c) => {
-    if (c.edhrec_rank == null || c.edhrec_rank <= 0) return false
-    if (!getCardImage(c)) return false
-    if (mode === 'commanders') return isCommander(c)
-    return !isCommander(c) && !isLand(c)
-  })
+function hasRank(card: CardRecord): boolean {
+  return card.edhrec_rank != null && card.edhrec_rank > 0 && Boolean(getCardImage(card))
+}
+
+/** EDHREC commander popularity list (from commanders.json). */
+export function buildCommanderRankPool(commanders: CardRecord[]): CardRecord[] {
+  return commanders.filter(hasRank)
+}
+
+/** EDHREC card popularity ranks for non-commander cards. */
+export function buildCardRankPool(cards: CardRecord[]): CardRecord[] {
+  return cards.filter((c) => hasRank(c) && !isCommander(c) && !isLand(c))
 }
 
 export function morePopularCard(a: CardRecord, b: CardRecord): CardRecord {
@@ -78,24 +83,30 @@ export function formatEdhrecRank(rank: number | undefined): string {
   return `#${rank.toLocaleString()}`
 }
 
-export function rankLabel(mode: RankGameMode): string {
-  return mode === 'commanders' ? 'EDHREC' : 'EDHREC staple'
+export function rankLabel(_mode: RankGameMode): string {
+  return 'EDHREC rank'
 }
 
 export function modePrompt(mode: RankGameMode): string {
   return mode === 'commanders'
     ? 'Tap the more popular commander on EDHREC'
-    : 'Tap the more popular staple on EDHREC'
+    : 'Tap the card with the better EDHREC rank'
 }
 
 export function modeDescription(mode: RankGameMode): string {
   return mode === 'commanders'
-    ? 'Which commander is more popular on EDHREC? Lower rank number wins.'
-    : 'Which staple is more popular on EDHREC? Lower rank number wins.'
+    ? 'Which commander is more popular as a commander on EDHREC? Lower rank number wins.'
+    : 'Which card has a better EDHREC rank? Lower rank number wins.'
 }
 
 export function poolTooSmallMessage(mode: RankGameMode): string {
   return mode === 'commanders'
     ? 'Not enough ranked commanders in the database.'
     : 'Not enough ranked cards in the database.'
+}
+
+export function modePoolCaption(mode: RankGameMode, count: number): string {
+  return mode === 'commanders'
+    ? `EDHREC commander ranks · ${count.toLocaleString()} commanders`
+    : `EDHREC card ranks · ${count.toLocaleString()} cards`
 }

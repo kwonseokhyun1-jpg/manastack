@@ -49,8 +49,27 @@ type PoolFile = {
   cards: CardRecord[]
 }
 
-let minigamePoolCache: CardRecord[] | null = null
+type CommandersFile = {
+  updated_at: string
+  count: number
+  commanders: CardRecord[]
+}
+
+let commanderPoolCache: CardRecord[] | null = null
 let standardPoolCache: CardRecord[] | null = null
+
+export async function loadCommanderRankPool(): Promise<CardRecord[]> {
+  if (commanderPoolCache) return commanderPoolCache
+
+  const raw = await fetchJsonAsset<CommandersFile>(
+    'data/commanders.json',
+    'Commander rank list',
+  )
+  commanderPoolCache = raw.commanders.map(normalizeCardRecord)
+  return commanderPoolCache
+}
+
+let minigamePoolCache: CardRecord[] | null = null
 
 export async function loadMinigamePool(): Promise<CardRecord[]> {
   if (cache) return cache.cards
