@@ -15,6 +15,10 @@ export async function fetchJsonAsset<T>(relativePath: string, label: string): Pr
         `${label} not found (${res.status}). Link card data with npm run ensure-data.`,
       )
     }
+    const contentType = res.headers.get('content-type') ?? ''
+    if (!contentType.includes('json')) {
+      throw new Error(`${label} returned non-JSON content (${contentType || 'unknown'}).`)
+    }
     return (await res.json()) as T
   } catch (err) {
     if (err instanceof Error && err.message.includes('not found')) throw err

@@ -35,12 +35,20 @@ function dedupeCardsByCanonicalName(cards: CardRecord[]): CardRecord[] {
 export async function loadCardDatabase(): Promise<CardDatabase> {
   if (cache) return cache
 
-  const raw = await fetchJsonAsset<CardDatabase>('data/cards.json', 'Card database')
-  const cards = dedupeCardsByCanonicalName(raw.cards.map(normalizeCardRecord))
-  cache = { ...raw, cards, count: cards.length }
-  nameIndex = new Map(cards.map((c) => [canonicalNameKey(c.name), c]))
-  initCardNameIndex(cards)
-  return cache
+  const loadFromPool = async (relativePath: string, label: string) => {
+    const raw = await fetchJsonAsset<PoolFile>(relativePath, label)
+    const cards = dedupeCardsByCanonicalName(raw.cards.map(normalizeCardRecord))
+    cache = { updated_at: raw.updated_at, count: cards.length, cards }
+    nameIndex = new Map(cards.map((c) => [canonicalNameKey(c.name), c]))
+    initCardNameIndex(cards)
+    return cache
+  }
+
+  try {
+    return await loadFromPool('data/minigame-pool.json', 'Minigame pool')
+  } catch {
+    return loadFromPool('data/cards.json', 'Card database')
+  }
 }
 
 type PoolFile = {
