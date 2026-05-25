@@ -22,7 +22,7 @@ import {
 import { buildBoosterPack, cardToCollectedFields } from '../lib/booster'
 import type { CardRarity } from '../lib/card-rarity'
 import { canonicalNameKey } from '../lib/card-names'
-import { loadCardDatabase, loadStandardPool } from '../lib/card-db'
+import { loadMinigamePool, loadStandardPool } from '../lib/card-db'
 import { loadRarityMap } from '../lib/rarity-db'
 import { createId, defaultSave, loadSave, normalizeSave, persistSave } from '../lib/storage'
 import { applyDailyLoginClaim, canClaimDailyLogin } from '../lib/daily-login'
@@ -91,15 +91,15 @@ export function GameProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let cancelled = false
 
-    loadCardDatabase()
-      .then((db) => {
+    loadMinigamePool()
+      .then((cards) => {
         if (cancelled) return
-        setCardPool(db.cards)
+        setCardPool(cards)
         setCardPoolLoading(false)
       })
       .catch(() => {
         if (cancelled) return
-        setCardPoolError('Could not load card database for booster packs.')
+        setCardPoolError('Could not load Commander card pool for booster packs.')
         setCardPoolLoading(false)
       })
 
@@ -279,7 +279,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
         if (pool.length === 0) {
           pool =
             format === 'commander'
-              ? (await loadCardDatabase()).cards
+              ? await loadMinigamePool()
               : await loadStandardPool()
           if (format === 'commander') setCardPool(pool)
           else setStandardPool(pool)
@@ -294,7 +294,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
           err instanceof Error
             ? err.message
             : format === 'commander'
-              ? 'Card database not available.'
+              ? 'Commander card pool not available.'
               : 'Standard card pool not available. Run npm run build:standard.'
         return { packs: [], error: message }
       }
@@ -312,7 +312,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
           error:
             format === 'standard'
               ? 'Standard card pool is empty. Run npm run build:standard.'
-              : 'Card database not available.',
+              : 'Commander card pool is empty.',
         }
       }
 

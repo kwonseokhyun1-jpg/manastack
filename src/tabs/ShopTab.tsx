@@ -111,11 +111,8 @@ export function ShopTab() {
     }
   }, [reveal])
 
-  const shopDisabled =
-    cardPoolLoading ||
-    standardPoolLoading ||
-    rarityMapLoading ||
-    !!rarityMapError
+  const shopLoading = cardPoolLoading || standardPoolLoading || rarityMapLoading
+  const shopDisabled = shopLoading || !!rarityMapError
 
   async function animatePack(cards: BoosterCard[], label?: string) {
     setReveal({ kind: 'pack', cards, index: -1, label })
