@@ -177,4 +177,86 @@ app.put('/api/save', authMiddleware, async (req, res) => {
   })
 })
 
+function normalizeTradeCards(raw) {
+  if (!Array.isArray(raw)) return []
+  const out = []
+  for (const item of raw) {
+    const name = String(item?.name ?? '').trim()
+    if (!name) continue
+    out.push({
+      name,
+      foil: Boolean(item?.foil),
+    })
+  }
+  return out
+}
+
+app.get('/api/trades', async (req, res) => {
+  const q = String(req.query.q ?? '').trim()
+  const limit = Math.min(Number(req.query.limit) || 50, 100)
+  const offset = Math.max(Number(req.query.offset) || 0, 0)
+
+  await withDb(res, async (db) => {
+    const trades = await db.listTrades({ q, limit, offset })
+    res.json({ trades })
+  })
+})
+
+app.post('/api/trades', authMiddleware, async (req, res) => {
+  const offering = normalizeTradeCards(req.body?.offering)
+  const wanting = normalizeTradeCards(req.body?.wanting)
+  const note = String(req.body?.note ?? '').trim().slice(0, 500)
+
+  if (offering.length === 0 && wanting.length === 0) {
+    res.status(400).json({ error: 'Add at least one card to offer or want.' })
+    return
+  }
+  if (offering.length > 30 || wanting.length > 30) {
+    res.status(400).json({ error: 'Maximum 30 cards per side.' })
+    return
+  }
+
+  await withDb(res, async (db) => {
+    const user = await db.findUserById(req.userId)
+    if (!user) {
+      res.status(401).json({ error: 'User not found.' })
+      return
+    }
+
+    const id = crypto.randomUUID()
+    await db.createTrade(
+      id,
+      req.userId,
+      JSON.stringify(offering),
+      JSON.stringify(wanting),
+      note || null,
+    )
+
+    res.status(201).json({
+      trade: {
+        id,
+        userId: req.userId,
+        username: user.username ?? null,
+        offering,
+        wanting,
+        note: note || undefined,
+        createdAt: Date.now(),
+      },
+    })
+  })
+})
+
+app.delete('/api/trades/:id', authMiddleware, async (req, res) => {
+  const id = String(req.params.id ?? '')
+
+  await withDb(res, async (db) => {
+    const deleted = await db.deleteTrade(id, req.userId)
+    if (!deleted) {
+      res.status(404).json({ error: 'Trade not found or not yours.' })
+      return
+    }
+    res.json({ ok: true })
+  })
+})
+
 export default app

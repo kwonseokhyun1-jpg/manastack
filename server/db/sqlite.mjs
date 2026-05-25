@@ -37,6 +37,19 @@ db.exec(`
   WHERE username IS NOT NULL
 `)
 
+db.exec(`
+  CREATE TABLE IF NOT EXISTS trades (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    offering TEXT NOT NULL,
+    wanting TEXT NOT NULL,
+    note TEXT,
+    created_at INTEGER NOT NULL
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_trades_created ON trades(created_at DESC);
+`)
+
 export function normalizeUsername(raw) {
   return String(raw ?? '').trim()
 }
@@ -72,4 +85,73 @@ export async function upsertSave(userId, data, updatedAt) {
     INSERT INTO saves (user_id, data, updated_at) VALUES (?, ?, ?)
     ON CONFLICT(user_id) DO UPDATE SET data = excluded.data, updated_at = excluded.updated_at
   `).run(userId, data, updatedAt)
+}
+
+function mapTradeRow(row) {
+  if (!row) return null
+  return {
+    id: row.id,
+    userId: row.user_id,
+    username: row.username ?? null,
+    offering: JSON.parse(row.offering),
+    wanting: JSON.parse(row.wanting),
+    note: row.note ?? undefined,
+    createdAt: Number(row.created_at),
+  }
+}
+
+export async function listTrades({ q, limit = 50, offset = 0 } = {}) {
+  const search = String(q ?? '').trim()
+  if (!search) {
+    const rows = db
+      .prepare(
+        `SELECT t.id, t.user_id, t.offering, t.wanting, t.note, t.created_at, u.username
+         FROM trades t
+         JOIN users u ON u.id = t.user_id
+         ORDER BY t.created_at DESC
+         LIMIT ? OFFSET ?`,
+      )
+      .all(limit, offset)
+    return rows.map(mapTradeRow)
+  }
+
+  const pattern = `%${search.toLowerCase()}%`
+  const rows = db
+    .prepare(
+      `SELECT t.id, t.user_id, t.offering, t.wanting, t.note, t.created_at, u.username
+       FROM trades t
+       JOIN users u ON u.id = t.user_id
+       WHERE lower(u.username) LIKE ?
+          OR lower(t.offering) LIKE ?
+          OR lower(t.wanting) LIKE ?
+          OR lower(coalesce(t.note, '')) LIKE ?
+       ORDER BY t.created_at DESC
+       LIMIT ? OFFSET ?`,
+    )
+    .all(pattern, pattern, pattern, pattern, limit, offset)
+  return rows.map(mapTradeRow)
+}
+
+export async function createTrade(id, userId, offeringJson, wantingJson, note) {
+  db.prepare(
+    `INSERT INTO trades (id, user_id, offering, wanting, note, created_at)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+  ).run(id, userId, offeringJson, wantingJson, note ?? null, Date.now())
+}
+
+export async function deleteTrade(id, userId) {
+  const result = db.prepare('DELETE FROM trades WHERE id = ? AND user_id = ?').run(id, userId)
+  return result.changes > 0
+}
+
+export async function getTradeById(id) {
+  const row = db
+    .prepare(
+      `SELECT t.id, t.user_id, t.offering, t.wanting, t.note, t.created_at, u.username
+       FROM trades t
+       JOIN users u ON u.id = t.user_id
+       WHERE t.id = ?`,
+    )
+    .get(id)
+  return mapTradeRow(row)
 }

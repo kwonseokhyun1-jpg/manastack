@@ -2,12 +2,13 @@ import type { ReactNode } from 'react'
 import { AuthButton } from './AuthButton'
 import { ManaDisplay } from './ManaDisplay'
 
-export type TabId = 'minigames' | 'shop' | 'inventory' | 'profile'
+export type TabId = 'minigames' | 'shop' | 'inventory' | 'trade' | 'profile'
 
 const TABS: { id: TabId; label: string; icon: string }[] = [
   { id: 'minigames', label: 'Minigames', icon: '🎮' },
   { id: 'shop', label: 'Shop', icon: '🛒' },
   { id: 'inventory', label: 'Inventory', icon: '📚' },
+  { id: 'trade', label: 'Trade', icon: '🔄' },
   { id: 'profile', label: 'Profile', icon: '👤' },
 ]
 

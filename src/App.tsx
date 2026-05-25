@@ -7,6 +7,7 @@ import { MinigamesTab } from './tabs/MinigamesTab'
 import { ShopTab } from './tabs/ShopTab'
 import { InventoryTab } from './tabs/InventoryTab'
 import { ProfileTab } from './tabs/ProfileTab'
+import { TradeTab } from './tabs/TradeTab'
 
 function AppShell() {
   const [tab, setTab] = useState<TabId>('minigames')
@@ -17,6 +18,7 @@ function AppShell() {
         {tab === 'minigames' && <MinigamesTab />}
         {tab === 'shop' && <ShopTab />}
         {tab === 'inventory' && <InventoryTab />}
+        {tab === 'trade' && <TradeTab />}
         {tab === 'profile' && <ProfileTab />}
       </Layout>
       <AuthModal />

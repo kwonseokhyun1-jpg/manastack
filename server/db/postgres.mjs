@@ -42,6 +42,21 @@ export async function ensureSchema() {
     )
   `
 
+  await sql`
+    CREATE TABLE IF NOT EXISTS trades (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      offering TEXT NOT NULL,
+      wanting TEXT NOT NULL,
+      note TEXT,
+      created_at BIGINT NOT NULL
+    )
+  `
+
+  await sql`
+    CREATE INDEX IF NOT EXISTS idx_trades_created ON trades(created_at DESC)
+  `
+
   schemaReady = true
 }
 
@@ -95,4 +110,73 @@ export async function upsertSave(userId, data, updatedAt) {
     ON CONFLICT (user_id) DO UPDATE
     SET data = EXCLUDED.data, updated_at = EXCLUDED.updated_at
   `
+}
+
+function mapTradeRow(row) {
+  if (!row) return null
+  return {
+    id: row.id,
+    userId: row.user_id,
+    username: row.username ?? null,
+    offering: JSON.parse(row.offering),
+    wanting: JSON.parse(row.wanting),
+    note: row.note ?? undefined,
+    createdAt: Number(row.created_at),
+  }
+}
+
+export async function listTrades({ q, limit = 50, offset = 0 } = {}) {
+  await ensureSchema()
+  const search = String(q ?? '').trim()
+  if (!search) {
+    const rows = await sql`
+      SELECT t.id, t.user_id, t.offering, t.wanting, t.note, t.created_at, u.username
+      FROM trades t
+      JOIN users u ON u.id = t.user_id
+      ORDER BY t.created_at DESC
+      LIMIT ${limit} OFFSET ${offset}
+    `
+    return rows.map(mapTradeRow)
+  }
+
+  const pattern = `%${search.toLowerCase()}%`
+  const rows = await sql`
+    SELECT t.id, t.user_id, t.offering, t.wanting, t.note, t.created_at, u.username
+    FROM trades t
+    JOIN users u ON u.id = t.user_id
+    WHERE lower(u.username) LIKE ${pattern}
+       OR lower(t.offering) LIKE ${pattern}
+       OR lower(t.wanting) LIKE ${pattern}
+       OR lower(coalesce(t.note, '')) LIKE ${pattern}
+    ORDER BY t.created_at DESC
+    LIMIT ${limit} OFFSET ${offset}
+  `
+  return rows.map(mapTradeRow)
+}
+
+export async function createTrade(id, userId, offeringJson, wantingJson, note) {
+  await ensureSchema()
+  await sql`
+    INSERT INTO trades (id, user_id, offering, wanting, note, created_at)
+    VALUES (${id}, ${userId}, ${offeringJson}, ${wantingJson}, ${note ?? null}, ${Date.now()})
+  `
+}
+
+export async function deleteTrade(id, userId) {
+  await ensureSchema()
+  const rows = await sql`
+    DELETE FROM trades WHERE id = ${id} AND user_id = ${userId} RETURNING id
+  `
+  return rows.length > 0
+}
+
+export async function getTradeById(id) {
+  await ensureSchema()
+  const rows = await sql`
+    SELECT t.id, t.user_id, t.offering, t.wanting, t.note, t.created_at, u.username
+    FROM trades t
+    JOIN users u ON u.id = t.user_id
+    WHERE t.id = ${id}
+  `
+  return mapTradeRow(rows[0])
 }
