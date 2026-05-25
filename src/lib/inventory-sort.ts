@@ -31,6 +31,15 @@ export function buildCardLookup(cards: CardRecord[]): Map<string, CardRecord> {
   return new Map(cards.map((c) => [canonicalNameKey(c.name), c]))
 }
 
+export function filterCollectedCardsByQuery(
+  items: CollectedCard[],
+  query: string,
+): CollectedCard[] {
+  const q = query.trim().toLowerCase()
+  if (!q) return items
+  return items.filter((card) => card.name.toLowerCase().includes(q))
+}
+
 export function sortCollectedCards(
   items: CollectedCard[],
   mode: InventorySortMode,
