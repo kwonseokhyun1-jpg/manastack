@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { ArtTagBadge } from '../components/ArtTagBadge'
 import { CardDetailModal } from '../components/CardDetailModal'
 import { CardTile } from '../components/CardTile'
 import { ManaDisplay } from '../components/ManaDisplay'
@@ -67,16 +68,7 @@ function ShopProduct({
           }}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-[var(--color-mtg-panel)] via-[var(--color-mtg-panel)]/40 to-black/20" />
-        <span
-          className="absolute left-3 top-3 rounded-full border px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider backdrop-blur-sm"
-          style={{
-            borderColor: `${art.accent}99`,
-            backgroundColor: `${art.accent}22`,
-            color: art.accent,
-          }}
-        >
-          {art.tag}
-        </span>
+        <ArtTagBadge accent={art.accent} tag={art.tag} />
       </div>
 
       <div className="flex flex-1 flex-col p-5">

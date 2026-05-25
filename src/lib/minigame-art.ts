@@ -36,7 +36,7 @@ export const MINIGAME_ART: Record<MinigameArtId, MinigameArt> = {
     image:
       'https://cards.scryfall.io/art_crop/front/9/5/95f27eeb-6f14-4db3-adb9-9be5ed76b34b.jpg?1753711947',
     focal: '50% 40%',
-    accent: '#8a7020',
+    accent: '#b45309',
     tag: 'Letter by letter',
   },
   'description-match': {
@@ -50,14 +50,14 @@ export const MINIGAME_ART: Record<MinigameArtId, MinigameArt> = {
     image:
       'https://cards.scryfall.io/art_crop/front/8/7/870ec754-a76c-40ea-9b81-81b3dca1f62c.jpg?1775940518',
     focal: '50% 50%',
-    accent: '#c9a227',
+    accent: '#eab308',
     tag: 'Rules judge',
   },
   'edhrec-rank': {
     image:
       'https://cards.scryfall.io/art_crop/front/1/0/10d42b35-844f-4a64-9981-c6118d45e826.jpg?1689999317',
     focal: '50% 20%',
-    accent: '#a78bfa',
+    accent: '#8b5cf6',
     tag: 'EDHREC ranks',
   },
 }
