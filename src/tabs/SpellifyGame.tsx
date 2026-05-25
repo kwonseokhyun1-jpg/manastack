@@ -13,7 +13,7 @@ import {
   SPELLIFY_MAX_GUESSES,
   type GuessEntry,
 } from '../lib/spellify-engine'
-import { SPELLIFY_MANA_REWARD_LABEL, spellifyManaReward } from '../types/game'
+import { SPELLIFY_HARD_MANA_REWARD_LABEL, SPELLIFY_MANA_REWARD_LABEL, spellifyManaReward } from '../types/game'
 import type { CardRecord } from '../types/card'
 import {
   isCorrectGuess,
@@ -128,12 +128,15 @@ export function SpellifyGame() {
 
   useEffect(() => {
     if (round?.phase === 'won' && !round.manaAwarded) {
-      const awarded = awardMinigameMana('spellify', spellifyManaReward(round.guesses.length))
+      const awarded = awardMinigameMana(
+        'spellify',
+        spellifyManaReward(round.guesses.length, mode === 'hard'),
+      )
       setRound((prev) =>
         prev ? { ...prev, manaAwarded: true, manaEarned: awarded } : prev,
       )
     }
-  }, [round?.phase, round?.manaAwarded, round?.guesses.length, awardMinigameMana])
+  }, [round?.phase, round?.manaAwarded, round?.guesses.length, mode, awardMinigameMana])
 
   const switchMode = useCallback(
     (next: GameMode) => {
@@ -267,7 +270,8 @@ export function SpellifyGame() {
             </p>
           )}
           <p className="mt-3 text-xs text-neutral-400">
-            {SPELLIFY_MAX_GUESSES} tries max · Win rewards: {SPELLIFY_MANA_REWARD_LABEL}
+            {SPELLIFY_MAX_GUESSES} tries max · Win rewards:{' '}
+            {mode === 'hard' ? SPELLIFY_HARD_MANA_REWARD_LABEL : SPELLIFY_MANA_REWARD_LABEL}
           </p>
         </div>
 

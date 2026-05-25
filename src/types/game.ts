@@ -84,15 +84,19 @@ export function manaRewardForAttempt(attempt: number): number {
 
 export const GUESS_MANA_REWARD_LABEL = '5 → 4 → 3 → 2 → 1 mana by try'
 
-/** Spellify win payout by total guesses used (1–13). */
-export function spellifyManaReward(guesses: number): number {
-  if (guesses <= 3) return 5
-  if (guesses <= 6) return 4
-  if (guesses <= 9) return 3
-  if (guesses <= 11) return 2
-  if (guesses <= 13) return 1
-  return 0
+/** Spellify win payout by total guesses used (1–13). Hard mode pays double. */
+export function spellifyManaReward(guesses: number, hardMode = false): number {
+  let reward = 0
+  if (guesses <= 3) reward = 5
+  else if (guesses <= 6) reward = 4
+  else if (guesses <= 9) reward = 3
+  else if (guesses <= 11) reward = 2
+  else if (guesses <= 13) reward = 1
+  return hardMode ? reward * 2 : reward
 }
 
 export const SPELLIFY_MANA_REWARD_LABEL =
   '5 mana (1–3 tries), 4 (4–6), 3 (7–9), 2 (10–11), 1 (12–13)'
+
+export const SPELLIFY_HARD_MANA_REWARD_LABEL =
+  '10 mana (1–3 tries), 8 (4–6), 6 (7–9), 4 (10–11), 2 (12–13) — double hard mode'
