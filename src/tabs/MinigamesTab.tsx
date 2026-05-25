@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import { MinigameMenuCard } from '../components/MinigameMenuCard'
+import type { MinigameArtId } from '../lib/minigame-art'
 import { ArtGuessGame } from './ArtGuessGame'
 import { DescriptionMatchGame } from './DescriptionMatchGame'
 import { EdhrecRankGame } from './EdhrecRankGame'
@@ -18,16 +20,9 @@ import {
   DESCRIPTION_MATCH_TIME_SEC,
 } from '../lib/description-match'
 
-type MinigameId =
-  | 'menu'
-  | 'art-guess'
-  | 'unscramble'
-  | 'spellify'
-  | 'rule-trivia'
-  | 'description-match'
-  | 'edhrec-rank'
+type MinigameId = 'menu' | MinigameArtId
 
-const GAMES = [
+const GAMES: { id: MinigameArtId; title: string; description: string }[] = [
   {
     id: 'art-guess' as const,
     title: 'Art Guess',
@@ -269,17 +264,11 @@ export function MinigamesTab() {
 
       <div className="grid gap-4 sm:grid-cols-2">
         {GAMES.map((game) => (
-          <button
+          <MinigameMenuCard
             key={game.id}
-            type="button"
-            onClick={() => setActive(game.id)}
-            className="rounded-xl border border-[var(--color-mtg-border)] bg-[var(--color-mtg-panel)] p-5 text-left transition hover:border-[var(--color-mtg-gold-dim)] hover:bg-[var(--color-mtg-panel)]/80"
-          >
-            <h3 className="font-[family-name:var(--font-display)] text-lg font-semibold text-white">
-              {game.title}
-            </h3>
-            <p className="mt-2 text-sm text-[var(--color-mtg-muted)]">{game.description}</p>
-          </button>
+            game={game}
+            onSelect={() => setActive(game.id)}
+          />
         ))}
       </div>
 

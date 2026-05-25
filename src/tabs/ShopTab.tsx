@@ -5,6 +5,7 @@ import { ManaDisplay } from '../components/ManaDisplay'
 import { useGame } from '../context/GameContext'
 import { cardToCollectedFields } from '../lib/booster'
 import { getCardImage } from '../lib/card-utils'
+import { SHOP_ART, type ShopArtId } from '../lib/shop-art'
 import type { BoosterCard, CollectedCard } from '../types/game'
 import {
   BOOSTER_BOX_COST,
@@ -20,7 +21,7 @@ type RevealState =
   | { kind: 'box'; packs: BoosterCard[][]; packIndex: number; cardIndex: number; label?: string }
 
 function ShopProduct({
-  icon,
+  artId,
   title,
   bullets,
   cost,
@@ -32,7 +33,7 @@ function ShopProduct({
   needMore,
   onBuy,
 }: {
-  icon: string
+  artId: ShopArtId
   title: string
   bullets: string[]
   cost: number
@@ -44,35 +45,64 @@ function ShopProduct({
   needMore: string
   onBuy: () => void
 }) {
+  const art = SHOP_ART[artId]
+
   return (
-    <div className="flex flex-col rounded-xl border border-[var(--color-mtg-border)] bg-[var(--color-mtg-panel)] p-6 text-center">
-      <div className="mx-auto mb-4 flex h-32 w-24 items-center justify-center rounded-lg border-2 border-dashed border-[var(--color-mtg-gold-dim)] bg-gradient-to-br from-[var(--color-mtg-gold)]/20 to-[var(--color-mana-u)]/20">
-        <span className="text-4xl" aria-hidden>
-          {icon}
+    <div
+      className="group flex flex-col overflow-hidden rounded-xl border border-[var(--color-mtg-border)] bg-[var(--color-mtg-panel)] text-left transition hover:border-[var(--color-mtg-gold-dim)] hover:shadow-[0_0_24px_-4px_var(--glow-color)]"
+      style={{ ['--glow-color' as string]: `${art.accent}66` }}
+    >
+      <div className="relative h-32 overflow-hidden">
+        <img
+          src={art.image}
+          alt=""
+          loading="lazy"
+          className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+          style={{ objectPosition: art.focal }}
+        />
+        <div
+          className="absolute inset-0 opacity-40 mix-blend-color"
+          style={{
+            background: `linear-gradient(135deg, ${art.accent}88 0%, transparent 60%)`,
+          }}
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-[var(--color-mtg-panel)] via-[var(--color-mtg-panel)]/40 to-black/20" />
+        <span
+          className="absolute left-3 top-3 rounded-full border px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider backdrop-blur-sm"
+          style={{
+            borderColor: `${art.accent}99`,
+            backgroundColor: `${art.accent}22`,
+            color: art.accent,
+          }}
+        >
+          {art.tag}
         </span>
       </div>
-      <h3 className="font-[family-name:var(--font-display)] text-lg font-semibold text-white">
-        {title}
-      </h3>
-      <ul className="mt-3 flex-1 space-y-1 text-left text-sm text-[var(--color-mtg-muted)]">
-        {bullets.map((line) => (
-          <li key={line}>• {line}</li>
-        ))}
-      </ul>
-      <p className="mt-4 text-sm text-[var(--color-mtg-muted)]">
-        Cost:{' '}
-        <span className="font-semibold text-[var(--color-mana-u)]">
-          {costLabel ?? `${cost} mana`}
-        </span>
-      </p>
-      <button
-        type="button"
-        onClick={onBuy}
-        disabled={!canAfford || disabled || busy}
-        className="mt-4 w-full rounded-lg bg-[var(--color-mtg-gold)] py-3 text-sm font-semibold text-black transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
-      >
-        {busy ? busyLabel : canAfford ? `Open ${title}` : needMore}
-      </button>
+
+      <div className="flex flex-1 flex-col p-5">
+        <h3 className="font-[family-name:var(--font-display)] text-lg font-semibold text-white">
+          {title}
+        </h3>
+        <ul className="mt-3 flex-1 space-y-1 text-sm text-[var(--color-mtg-muted)]">
+          {bullets.map((line) => (
+            <li key={line}>• {line}</li>
+          ))}
+        </ul>
+        <p className="mt-4 text-sm text-[var(--color-mtg-muted)]">
+          Cost:{' '}
+          <span className="font-semibold text-[var(--color-mana-u)]">
+            {costLabel ?? `${cost} mana`}
+          </span>
+        </p>
+        <button
+          type="button"
+          onClick={onBuy}
+          disabled={!canAfford || disabled || busy}
+          className="mt-4 w-full rounded-lg bg-[var(--color-mtg-gold)] py-3 text-sm font-semibold text-black transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          {busy ? busyLabel : canAfford ? `Open ${title}` : needMore}
+        </button>
+      </div>
     </div>
   )
 }
@@ -224,7 +254,7 @@ export function ShopTab() {
             </button>
           )}
         </div>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-5">
+        <div className="mx-auto grid max-w-2xl grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5">
           {reveal.cards.map((entry, i) => {
             const visible = i <= reveal.index
             const preview = {
@@ -238,11 +268,12 @@ export function ShopTab() {
             return (
               <div
                 key={`${entry.card.id}-${i}`}
-                className={`transition-all duration-300 ${
+                className={`mx-auto w-full max-w-[8.5rem] transition-all duration-300 ${
                   visible ? 'scale-100 opacity-100' : 'scale-90 opacity-0'
                 }`}
               >
                 <CardTile
+                  compact
                   card={{
                     ...preview,
                     image: preview.image ?? getCardImage(entry.card),
@@ -286,7 +317,7 @@ export function ShopTab() {
                 <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--color-mtg-gold)]">
                   Pack {packIdx + 1} of {reveal.packs.length}
                 </p>
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-5">
+                <div className="mx-auto grid max-w-2xl grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5">
                   {pack.map((entry, cardIdx) => {
                     const visible = !isCurrentPack || cardIdx <= reveal.cardIndex
                     const preview = {
@@ -300,11 +331,12 @@ export function ShopTab() {
                     return (
                       <div
                         key={`${entry.card.id}-${packIdx}-${cardIdx}`}
-                        className={`transition-all duration-300 ${
+                        className={`mx-auto w-full max-w-[8.5rem] transition-all duration-300 ${
                           visible ? 'scale-100 opacity-100' : 'scale-90 opacity-0'
                         }`}
                       >
                         <CardTile
+                          compact
                           card={{
                             ...preview,
                             image: preview.image ?? getCardImage(entry.card),
@@ -350,7 +382,7 @@ export function ShopTab() {
 
         <div className="grid w-full gap-4 sm:grid-cols-2">
           <ShopProduct
-            icon="📦"
+            artId="commander-pack"
             title="Commander Pack"
             bullets={[
               `${CARDS_PER_PACK} random Commander-legal cards`,
@@ -368,7 +400,7 @@ export function ShopTab() {
             onBuy={() => void handleOpenPack()}
           />
           <ShopProduct
-            icon="⚡"
+            artId="standard-pack"
             title="Standard Pack"
             bullets={[
               `${CARDS_PER_PACK} random Standard-legal cards`,
@@ -386,7 +418,7 @@ export function ShopTab() {
             onBuy={() => void handleOpenStandardPack()}
           />
           <ShopProduct
-            icon="🎁"
+            artId="commander-box"
             title="Commander Box"
             bullets={[
               `${PACKS_PER_BOX} booster packs (${PACKS_PER_BOX * CARDS_PER_PACK} cards total)`,
@@ -404,7 +436,7 @@ export function ShopTab() {
             onBuy={() => void handleOpenBox()}
           />
           <ShopProduct
-            icon="📫"
+            artId="standard-box"
             title="Standard Box"
             bullets={[
               `${PACKS_PER_BOX} Standard packs (${PACKS_PER_BOX * CARDS_PER_PACK} cards total)`,
