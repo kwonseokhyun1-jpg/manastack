@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { ManaIcon } from './ManaIcon'
 import { TradeCardChip } from './TradeCollectionPicker'
+import { TradeOfferingCards } from './TradeOfferingCards'
 import type { TradeInbox, TradeInboxEntry, TradePost } from '../types/trade'
 
 function formatRelativeTime(ts: number): string {
@@ -107,11 +108,15 @@ function IncomingInboxCard({
 
         <OfferSummary entry={entry} />
 
-        <p className="mt-3 text-xs text-[var(--color-mtg-muted)]">
-          For listing:{' '}
-          {entry.trade.offering.map((card) => card.name).join(', ') || 'No cards'}
-          {entry.trade.note ? ` · Asking: ${entry.trade.note}` : ''}
-        </p>
+        <p className="mt-3 text-xs text-[var(--color-mtg-muted)]">For listing:</p>
+        <div className="mt-1.5">
+          <TradeOfferingCards cards={entry.trade.offering} compact />
+        </div>
+        {entry.trade.note && (
+          <p className="mt-2 text-xs text-[var(--color-mtg-muted)]">
+            Asking: {entry.trade.note}
+          </p>
+        )}
       </button>
 
       <div className="mt-4 flex gap-2">
@@ -167,11 +172,15 @@ function OutgoingInboxCard({
 
       <OfferSummary entry={entry} />
 
-      <p className="mt-3 text-xs text-[var(--color-mtg-muted)]">
-        For listing:{' '}
-        {entry.trade.offering.map((card) => card.name).join(', ') || 'No cards'}
-        {entry.trade.note ? ` · Asking: ${entry.trade.note}` : ''}
-      </p>
+      <p className="mt-3 text-xs text-[var(--color-mtg-muted)]">For listing:</p>
+      <div className="mt-1.5">
+        <TradeOfferingCards cards={entry.trade.offering} compact />
+      </div>
+      {entry.trade.note && (
+        <p className="mt-2 text-xs text-[var(--color-mtg-muted)]">
+          Asking: {entry.trade.note}
+        </p>
+      )}
     </button>
   )
 }
@@ -185,7 +194,6 @@ function InboxSection({
   onOpenTrade,
   onAccept,
   onDecline,
-  incoming,
 }: {
   title: string
   emptyMessage: string
@@ -209,7 +217,7 @@ function InboxSection({
       ) : (
         <div className="flex flex-col gap-3">
           {entries.map((entry) =>
-            incoming && onAccept && onDecline ? (
+            onAccept && onDecline ? (
               <IncomingInboxCard
                 key={entry.offer.id}
                 entry={entry}

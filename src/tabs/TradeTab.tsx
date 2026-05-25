@@ -4,8 +4,10 @@ import { useGame } from '../context/GameContext'
 import { CreateTradeModal } from '../components/CreateTradeModal'
 import { TradeInboxPanel } from '../components/TradeInboxPanel'
 import { TradeOfferModal } from '../components/TradeOfferModal'
+import { TradeOfferingCards } from '../components/TradeOfferingCards'
 import { deleteTrade, acceptTradeOffer, declineTradeOffer, fetchTradeInbox, fetchTrades } from '../lib/trade-api'
-import type { TradeCardEntry, TradeInbox, TradePost } from '../types/trade'
+import type { CollectedCard } from '../types/game'
+import type { TradeInbox, TradePost } from '../types/trade'
 
 type TradeView = 'browse' | 'inbox' | 'my-offers'
 
@@ -21,32 +23,16 @@ function formatRelativeTime(ts: number): string {
   return new Date(ts).toLocaleDateString()
 }
 
-function OfferingList({ cards }: { cards: TradeCardEntry[] }) {
-  if (cards.length === 0) {
-    return <p className="text-sm text-[var(--color-mtg-muted)]">No cards listed.</p>
-  }
-
-  return (
-    <ul className="space-y-0.5">
-      {cards.map((card, i) => (
-        <li key={`${card.instanceId ?? card.name}-${i}`} className="text-sm text-white">
-          {card.name}
-          {card.ultrafoil && <span className="ml-1 text-cyan-300">◈</span>}
-          {card.foil && !card.ultrafoil && <span className="ml-1 text-[var(--color-mtg-gold)]">✦</span>}
-        </li>
-      ))}
-    </ul>
-  )
-}
-
 function TradeCard({
   trade,
   isOwn,
+  collection,
   onOpen,
   onDelete,
 }: {
   trade: TradePost
   isOwn: boolean
+  collection: CollectedCard[]
   onOpen: (trade: TradePost) => void
   onDelete: (id: string) => void
 }) {
@@ -102,7 +88,7 @@ function TradeCard({
           Offering
         </p>
         <div className="mt-1">
-          <OfferingList cards={trade.offering} />
+          <TradeOfferingCards cards={trade.offering} collection={collection} />
         </div>
       </div>
 
@@ -324,6 +310,7 @@ export function TradeTab() {
                 key={trade.id}
                 trade={trade}
                 isOwn={user?.id === trade.userId}
+                collection={collection}
                 onOpen={handleOpenTrade}
                 onDelete={(id) => {
                   setTrades((prev) => prev.filter((t) => t.id !== id))

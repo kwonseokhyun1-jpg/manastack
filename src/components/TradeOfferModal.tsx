@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext'
 import { useGame } from '../context/GameContext'
 import { ManaIcon } from './ManaIcon'
 import { TradeCardChip, TradeCollectionPicker } from './TradeCollectionPicker'
+import { TradeOfferingCards } from './TradeOfferingCards'
 import { createTradeOffer, fetchTradeOffers } from '../lib/trade-api'
 import type { CollectedCard } from '../types/game'
 import type { TradeCardEntry, TradeOffer, TradePost } from '../types/trade'
@@ -17,24 +18,6 @@ function formatRelativeTime(ts: number): string {
   const days = Math.floor(hours / 24)
   if (days < 7) return `${days}d ago`
   return new Date(ts).toLocaleDateString()
-}
-
-function TradeCardList({ cards }: { cards: TradeCardEntry[] }) {
-  if (cards.length === 0) {
-    return <p className="text-sm text-[var(--color-mtg-muted)]">No cards listed.</p>
-  }
-
-  return (
-    <ul className="space-y-0.5">
-      {cards.map((card, i) => (
-        <li key={`${card.instanceId ?? card.name}-${i}`} className="text-sm text-white">
-          {card.name}
-          {card.ultrafoil && <span className="ml-1 text-cyan-300">◈</span>}
-          {card.foil && !card.ultrafoil && <span className="ml-1 text-[var(--color-mtg-gold)]">✦</span>}
-        </li>
-      ))}
-    </ul>
-  )
 }
 
 function OfferCard({ offer, isOwn }: { offer: TradeOffer; isOwn: boolean }) {
@@ -184,7 +167,7 @@ export function TradeOfferModal({
               They are offering
             </p>
             <div className="mt-2">
-              <TradeCardList cards={trade.offering} />
+              <TradeOfferingCards cards={trade.offering} collection={collection} />
             </div>
             {trade.note && (
               <p className="mt-3 rounded-lg bg-[var(--color-mtg-panel)] px-3 py-2 text-sm">
