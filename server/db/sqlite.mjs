@@ -3,7 +3,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import Database from 'better-sqlite3'
 
-const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..')
+const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..')
 const dataDir = path.join(root, 'data')
 const dbPath = path.join(dataDir, 'manastack.db')
 
@@ -41,35 +41,35 @@ export function normalizeUsername(raw) {
   return String(raw ?? '').trim()
 }
 
-export function findUserByEmail(email) {
+export async function ensureSchema() {}
+
+export async function findUserByEmail(email) {
   return db.prepare('SELECT * FROM users WHERE email = ?').get(email.trim().toLowerCase())
 }
 
-export function findUserByUsername(username) {
+export async function findUserByUsername(username) {
   const normalized = normalizeUsername(username)
   if (!normalized) return undefined
   return db.prepare('SELECT * FROM users WHERE username = ? COLLATE NOCASE').get(normalized)
 }
 
-export function findUserById(id) {
+export async function findUserById(id) {
   return db.prepare('SELECT id, email, username, created_at FROM users WHERE id = ?').get(id)
 }
 
-export function createUser(id, email, username, passwordHash) {
+export async function createUser(id, email, username, passwordHash) {
   db.prepare(
     'INSERT INTO users (id, email, username, password_hash, created_at) VALUES (?, ?, ?, ?, ?)',
   ).run(id, email.trim().toLowerCase(), normalizeUsername(username), passwordHash, Date.now())
 }
 
-export function getSave(userId) {
+export async function getSave(userId) {
   return db.prepare('SELECT data, updated_at FROM saves WHERE user_id = ?').get(userId)
 }
 
-export function upsertSave(userId, data, updatedAt) {
+export async function upsertSave(userId, data, updatedAt) {
   db.prepare(`
     INSERT INTO saves (user_id, data, updated_at) VALUES (?, ?, ?)
     ON CONFLICT(user_id) DO UPDATE SET data = excluded.data, updated_at = excluded.updated_at
   `).run(userId, data, updatedAt)
 }
-
-export { db }
