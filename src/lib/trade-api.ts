@@ -1,4 +1,5 @@
 import { getStoredToken } from './auth-api'
+import type { GameSave } from '../types/game'
 import type { TradeCardEntry, TradeInbox, TradeOffer, TradePost } from '../types/trade'
 
 type TradesResponse = {
@@ -125,4 +126,31 @@ export async function createTradeOffer(
     },
   )
   return data.offer
+}
+
+type AcceptOfferResponse = {
+  ok: boolean
+  save: GameSave
+}
+
+export async function acceptTradeOffer(offerId: string): Promise<GameSave> {
+  if (!getStoredToken()) {
+    throw new Error('Log in to accept offers.')
+  }
+
+  const data = await apiFetch<AcceptOfferResponse>(
+    `/api/trades/offers/${encodeURIComponent(offerId)}/accept`,
+    { method: 'POST' },
+  )
+  return data.save
+}
+
+export async function declineTradeOffer(offerId: string): Promise<void> {
+  if (!getStoredToken()) {
+    throw new Error('Log in to decline offers.')
+  }
+
+  await apiFetch(`/api/trades/offers/${encodeURIComponent(offerId)}/decline`, {
+    method: 'POST',
+  })
 }

@@ -64,6 +64,7 @@ type GameContextValue = {
   addCardToFolder: (folderId: string, instanceId: string) => void
   removeCardFromFolder: (folderId: string, instanceId: string) => void
   resetProgress: () => void
+  applyCloudSave: (save: GameSave) => void
   saveReady: boolean
   syncStatus: SyncStatus
   minigameManaRemainingToday: (gameId: MinigameManaId) => number
@@ -441,6 +442,13 @@ export function GameProvider({ children }: { children: ReactNode }) {
     queueCloudSync(fresh)
   }, [queueCloudSync])
 
+  const applyCloudSave = useCallback((nextSave: GameSave) => {
+    const next = normalizeSave(nextSave)
+    persistSave(next)
+    setSave(next)
+    setSyncStatus('saved')
+  }, [])
+
   const value = useMemo(
     () => ({
       mana: save.mana,
@@ -468,6 +476,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       addCardToFolder,
       removeCardFromFolder,
       resetProgress,
+      applyCloudSave,
       saveReady,
       syncStatus,
       minigameManaRemainingToday,
@@ -497,6 +506,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       addCardToFolder,
       removeCardFromFolder,
       resetProgress,
+      applyCloudSave,
       saveReady,
       syncStatus,
       minigameManaRemainingToday,

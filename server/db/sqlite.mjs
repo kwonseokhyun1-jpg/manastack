@@ -2,6 +2,11 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import Database from 'better-sqlite3'
+import {
+  executeTradeAcceptance,
+  parseSaveData,
+  serializeSave,
+} from '../trade-settlement.mjs'
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..')
 const dataDir = path.join(root, 'data')
@@ -260,4 +265,76 @@ export async function getTradeInbox(userId) {
     incoming: incomingRows.map(mapInboxRow),
     outgoing: outgoingRows.map(mapInboxRow),
   }
+}
+
+export async function getTradeOfferWithTrade(offerId) {
+  const row = db
+    .prepare(`${inboxSelect} WHERE o.id = ?`)
+    .get(offerId)
+  return row ? mapInboxRow(row) : null
+}
+
+export async function deleteTradeOffer(offerId, sellerUserId) {
+  const result = db
+    .prepare(
+      `DELETE FROM trade_offers
+       WHERE id = ?
+         AND trade_id IN (SELECT id FROM trades WHERE user_id = ?)`,
+    )
+    .run(offerId, sellerUserId)
+  return result.changes > 0
+}
+
+export async function deleteTradeById(id) {
+  db.prepare('DELETE FROM trades WHERE id = ?').run(id)
+}
+
+export async function acceptTradeOffer(offerId, sellerUserId) {
+  const entry = await getTradeOfferWithTrade(offerId)
+  if (!entry) {
+    return { ok: false, status: 404, error: 'Offer not found.' }
+  }
+  if (entry.trade.userId !== sellerUserId) {
+    return { ok: false, status: 403, error: 'Only the listing owner can accept offers.' }
+  }
+
+  const offererId = entry.offer.userId
+  const sellerSaveRow = await getSave(sellerUserId)
+  const offererSaveRow = await getSave(offererId)
+
+  let sellerSave
+  let offererSave
+  try {
+    const result = executeTradeAcceptance({
+      sellerSave: parseSaveData(sellerSaveRow?.data),
+      buyerSave: parseSaveData(offererSaveRow?.data),
+      listingCards: entry.trade.offering,
+      offerCards: entry.offer.cards,
+      offerMana: entry.offer.mana,
+    })
+    sellerSave = result.sellerSave
+    offererSave = result.buyerSave
+  } catch (err) {
+    return {
+      ok: false,
+      status: 400,
+      error: err instanceof Error ? err.message : 'Could not complete trade.',
+    }
+  }
+
+  const now = Date.now()
+  const run = db.transaction(() => {
+    db.prepare(`
+      INSERT INTO saves (user_id, data, updated_at) VALUES (?, ?, ?)
+      ON CONFLICT(user_id) DO UPDATE SET data = excluded.data, updated_at = excluded.updated_at
+    `).run(sellerUserId, serializeSave(sellerSave), now)
+    db.prepare(`
+      INSERT INTO saves (user_id, data, updated_at) VALUES (?, ?, ?)
+      ON CONFLICT(user_id) DO UPDATE SET data = excluded.data, updated_at = excluded.updated_at
+    `).run(offererId, serializeSave(offererSave), now)
+    db.prepare('DELETE FROM trades WHERE id = ?').run(entry.trade.id)
+  })
+  run()
+
+  return { ok: true, save: sellerSave }
 }

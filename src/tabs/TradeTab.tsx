@@ -4,7 +4,7 @@ import { useGame } from '../context/GameContext'
 import { CreateTradeModal } from '../components/CreateTradeModal'
 import { TradeInboxPanel } from '../components/TradeInboxPanel'
 import { TradeOfferModal } from '../components/TradeOfferModal'
-import { deleteTrade, fetchTradeInbox, fetchTrades } from '../lib/trade-api'
+import { deleteTrade, acceptTradeOffer, declineTradeOffer, fetchTradeInbox, fetchTrades } from '../lib/trade-api'
 import type { TradeCardEntry, TradeInbox, TradePost } from '../types/trade'
 
 type TradeView = 'browse' | 'inbox' | 'my-offers'
@@ -118,7 +118,7 @@ function TradeCard({
 
 export function TradeTab() {
   const { user, openAuthModal } = useAuth()
-  const { collection } = useGame()
+  const { collection, applyCloudSave } = useGame()
   const [view, setView] = useState<TradeView>('browse')
   const [query, setQuery] = useState('')
   const [debouncedQuery, setDebouncedQuery] = useState('')
@@ -199,6 +199,26 @@ export function TradeTab() {
     void loadTrades(debouncedQuery)
     if (user) void loadInbox()
   }
+
+  const handleAcceptOffer = useCallback(
+    async (offerId: string) => {
+      const save = await acceptTradeOffer(offerId)
+      applyCloudSave(save)
+      setSelectedTrade(null)
+      void loadTrades(debouncedQuery)
+      if (user) void loadInbox()
+    },
+    [applyCloudSave, debouncedQuery, loadInbox, loadTrades, user],
+  )
+
+  const handleDeclineOffer = useCallback(
+    async (offerId: string) => {
+      await declineTradeOffer(offerId)
+      void loadTrades(debouncedQuery)
+      if (user) void loadInbox()
+    },
+    [debouncedQuery, loadInbox, loadTrades, user],
+  )
 
   const incomingCount = user ? (inbox?.incoming.length ?? 0) : 0
   const outgoingCount = user ? (inbox?.outgoing.length ?? 0) : 0
@@ -324,6 +344,8 @@ export function TradeTab() {
           section={view === 'inbox' ? 'incoming' : 'outgoing'}
           onLogin={openAuthModal}
           onOpenTrade={handleOpenTrade}
+          onAcceptOffer={handleAcceptOffer}
+          onDeclineOffer={handleDeclineOffer}
         />
       )}
 

@@ -1,4 +1,9 @@
 import { neon } from '@neondatabase/serverless'
+import {
+  executeTradeAcceptance,
+  parseSaveData,
+  serializeSave,
+} from '../trade-settlement.mjs'
 
 function getSql() {
   const url = process.env.DATABASE_URL ?? process.env.POSTGRES_URL
@@ -312,4 +317,90 @@ export async function getTradeInbox(userId) {
     incoming: incomingRows.map(mapInboxRow),
     outgoing: outgoingRows.map(mapInboxRow),
   }
+}
+
+export async function getTradeOfferWithTrade(offerId) {
+  await ensureSchema()
+  const rows = await sql`
+    SELECT
+      o.id AS offer_id,
+      o.trade_id,
+      o.user_id AS offer_user_id,
+      o.mana,
+      o.cards,
+      o.note AS offer_note,
+      o.created_at AS offer_created_at,
+      ou.username AS offer_username,
+      t.user_id AS trade_user_id,
+      t.offering,
+      t.wanting,
+      t.note AS trade_note,
+      t.created_at AS trade_created_at,
+      tu.username AS trade_username
+    FROM trade_offers o
+    JOIN trades t ON t.id = o.trade_id
+    JOIN users ou ON ou.id = o.user_id
+    JOIN users tu ON tu.id = t.user_id
+    WHERE o.id = ${offerId}
+  `
+  return mapInboxRow(rows[0]) ?? null
+}
+
+export async function deleteTradeOffer(offerId, sellerUserId) {
+  await ensureSchema()
+  const rows = await sql`
+    DELETE FROM trade_offers o
+    USING trades t
+    WHERE o.id = ${offerId}
+      AND o.trade_id = t.id
+      AND t.user_id = ${sellerUserId}
+    RETURNING o.id
+  `
+  return rows.length > 0
+}
+
+export async function deleteTradeById(id) {
+  await ensureSchema()
+  await sql`DELETE FROM trades WHERE id = ${id}`
+}
+
+export async function acceptTradeOffer(offerId, sellerUserId) {
+  const entry = await getTradeOfferWithTrade(offerId)
+  if (!entry) {
+    return { ok: false, status: 404, error: 'Offer not found.' }
+  }
+  if (entry.trade.userId !== sellerUserId) {
+    return { ok: false, status: 403, error: 'Only the listing owner can accept offers.' }
+  }
+
+  const offererId = entry.offer.userId
+  const sellerSaveRow = await getSave(sellerUserId)
+  const offererSaveRow = await getSave(offererId)
+
+  let sellerSave
+  let offererSave
+  try {
+    const result = executeTradeAcceptance({
+      sellerSave: parseSaveData(sellerSaveRow?.data),
+      buyerSave: parseSaveData(offererSaveRow?.data),
+      listingCards: entry.trade.offering,
+      offerCards: entry.offer.cards,
+      offerMana: entry.offer.mana,
+    })
+    sellerSave = result.sellerSave
+    offererSave = result.buyerSave
+  } catch (err) {
+    return {
+      ok: false,
+      status: 400,
+      error: err instanceof Error ? err.message : 'Could not complete trade.',
+    }
+  }
+
+  const now = Date.now()
+  await upsertSave(sellerUserId, serializeSave(sellerSave), now)
+  await upsertSave(offererId, serializeSave(offererSave), now)
+  await deleteTradeById(entry.trade.id)
+
+  return { ok: true, save: sellerSave }
 }

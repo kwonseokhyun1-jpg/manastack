@@ -344,4 +344,30 @@ app.post('/api/trades/:id/offers', authMiddleware, async (req, res) => {
   })
 })
 
+app.post('/api/trades/offers/:offerId/accept', authMiddleware, async (req, res) => {
+  const offerId = String(req.params.offerId ?? '')
+
+  await withDb(res, async (db) => {
+    const result = await db.acceptTradeOffer(offerId, req.userId)
+    if (!result.ok) {
+      res.status(result.status ?? 400).json({ error: result.error })
+      return
+    }
+    res.json({ ok: true, save: result.save })
+  })
+})
+
+app.post('/api/trades/offers/:offerId/decline', authMiddleware, async (req, res) => {
+  const offerId = String(req.params.offerId ?? '')
+
+  await withDb(res, async (db) => {
+    const deleted = await db.deleteTradeOffer(offerId, req.userId)
+    if (!deleted) {
+      res.status(404).json({ error: 'Offer not found or not on your listing.' })
+      return
+    }
+    res.json({ ok: true })
+  })
+})
+
 export default app

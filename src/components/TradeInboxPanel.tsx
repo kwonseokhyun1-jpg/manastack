@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { ManaIcon } from './ManaIcon'
 import { TradeCardChip } from './TradeCollectionPicker'
 import type { TradeInbox, TradeInboxEntry, TradePost } from '../types/trade'
@@ -37,7 +38,107 @@ function OfferSummary({ entry }: { entry: TradeInboxEntry }) {
   )
 }
 
-function InboxCard({
+function IncomingInboxCard({
+  entry,
+  title,
+  subtitle,
+  onOpen,
+  onAccept,
+  onDecline,
+}: {
+  entry: TradeInboxEntry
+  title: string
+  subtitle: string
+  onOpen: (trade: TradePost) => void
+  onAccept: (offerId: string) => Promise<void>
+  onDecline: (offerId: string) => Promise<void>
+}) {
+  const [busyAction, setBusyAction] = useState<'accept' | 'decline' | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
+
+  async function handleAccept() {
+    if (
+      !confirm(
+        `Accept this offer from ${entry.offer.username ?? 'this player'}? Cards and mana will be exchanged immediately.`,
+      )
+    ) {
+      return
+    }
+
+    setBusyAction('accept')
+    setActionError(null)
+    try {
+      await onAccept(entry.offer.id)
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Could not accept offer.')
+    } finally {
+      setBusyAction(null)
+    }
+  }
+
+  async function handleDecline() {
+    setBusyAction('decline')
+    setActionError(null)
+    try {
+      await onDecline(entry.offer.id)
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Could not decline offer.')
+    } finally {
+      setBusyAction(null)
+    }
+  }
+
+  return (
+    <article className="rounded-xl border border-[var(--color-mtg-border)] bg-[var(--color-mtg-panel)] p-4">
+      <button
+        type="button"
+        onClick={() => onOpen(entry.trade)}
+        className="w-full text-left transition hover:opacity-90"
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="font-semibold text-white">{title}</p>
+            <p className="mt-1 text-xs text-[var(--color-mtg-muted)]">{subtitle}</p>
+          </div>
+          <span className="text-xs text-[var(--color-mana-u)]">
+            {formatRelativeTime(entry.offer.createdAt)}
+          </span>
+        </div>
+
+        <OfferSummary entry={entry} />
+
+        <p className="mt-3 text-xs text-[var(--color-mtg-muted)]">
+          For listing:{' '}
+          {entry.trade.offering.map((card) => card.name).join(', ') || 'No cards'}
+          {entry.trade.note ? ` · Asking: ${entry.trade.note}` : ''}
+        </p>
+      </button>
+
+      <div className="mt-4 flex gap-2">
+        <button
+          type="button"
+          onClick={() => void handleAccept()}
+          disabled={busyAction !== null}
+          className="flex-1 rounded-lg bg-emerald-600 py-2 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:opacity-50"
+        >
+          {busyAction === 'accept' ? 'Accepting…' : 'Accept'}
+        </button>
+        <button
+          type="button"
+          onClick={() => void handleDecline()}
+          disabled={busyAction !== null}
+          className="flex-1 rounded-lg border border-[var(--color-mtg-border)] py-2 text-sm font-semibold text-white transition hover:border-red-400 hover:text-red-300 disabled:opacity-50"
+        >
+          {busyAction === 'decline' ? 'Declining…' : 'Decline'}
+        </button>
+      </div>
+
+      {actionError && <p className="mt-3 text-sm text-red-400">{actionError}</p>}
+    </article>
+  )
+}
+
+function OutgoingInboxCard({
   entry,
   title,
   subtitle,
@@ -82,6 +183,9 @@ function InboxSection({
   renderTitle,
   renderSubtitle,
   onOpenTrade,
+  onAccept,
+  onDecline,
+  incoming,
 }: {
   title: string
   emptyMessage: string
@@ -89,6 +193,8 @@ function InboxSection({
   renderTitle: (entry: TradeInboxEntry) => string
   renderSubtitle: (entry: TradeInboxEntry) => string
   onOpenTrade: (trade: TradePost) => void
+  onAccept?: (offerId: string) => Promise<void>
+  onDecline?: (offerId: string) => Promise<void>
 }) {
   return (
     <section>
@@ -102,15 +208,27 @@ function InboxSection({
         </p>
       ) : (
         <div className="flex flex-col gap-3">
-          {entries.map((entry) => (
-            <InboxCard
-              key={entry.offer.id}
-              entry={entry}
-              title={renderTitle(entry)}
-              subtitle={renderSubtitle(entry)}
-              onOpen={onOpenTrade}
-            />
-          ))}
+          {entries.map((entry) =>
+            incoming && onAccept && onDecline ? (
+              <IncomingInboxCard
+                key={entry.offer.id}
+                entry={entry}
+                title={renderTitle(entry)}
+                subtitle={renderSubtitle(entry)}
+                onOpen={onOpenTrade}
+                onAccept={onAccept}
+                onDecline={onDecline}
+              />
+            ) : (
+              <OutgoingInboxCard
+                key={entry.offer.id}
+                entry={entry}
+                title={renderTitle(entry)}
+                subtitle={renderSubtitle(entry)}
+                onOpen={onOpenTrade}
+              />
+            ),
+          )}
         </div>
       )}
     </section>
@@ -125,6 +243,8 @@ export function TradeInboxPanel({
   section,
   onLogin,
   onOpenTrade,
+  onAcceptOffer,
+  onDeclineOffer,
 }: {
   inbox: TradeInbox | null
   loading: boolean
@@ -133,6 +253,8 @@ export function TradeInboxPanel({
   section: 'incoming' | 'outgoing'
   onLogin: () => void
   onOpenTrade: (trade: TradePost) => void
+  onAcceptOffer: (offerId: string) => Promise<void>
+  onDeclineOffer: (offerId: string) => Promise<void>
 }) {
   if (!loggedIn) {
     const loginHint =
@@ -180,6 +302,8 @@ export function TradeInboxPanel({
         renderTitle={(entry) => `${entry.offer.username ?? 'Unknown player'} made an offer`}
         renderSubtitle={() => 'On your trade listing'}
         onOpenTrade={onOpenTrade}
+        onAccept={onAcceptOffer}
+        onDecline={onDeclineOffer}
       />
     )
   }
