@@ -17,32 +17,21 @@ function formatRelativeTime(ts: number): string {
   return new Date(ts).toLocaleDateString()
 }
 
-function CardList({ label, cards }: { label: string; cards: TradeCardEntry[] }) {
+function OfferingList({ cards }: { cards: TradeCardEntry[] }) {
   if (cards.length === 0) {
-    return (
-      <div>
-        <p className="text-xs font-medium uppercase tracking-wide text-[var(--color-mtg-muted)]">
-          {label}
-        </p>
-        <p className="mt-1 text-sm text-[var(--color-mtg-muted)]">—</p>
-      </div>
-    )
+    return <p className="text-sm text-[var(--color-mtg-muted)]">No cards listed.</p>
   }
 
   return (
-    <div>
-      <p className="text-xs font-medium uppercase tracking-wide text-[var(--color-mtg-muted)]">
-        {label}
-      </p>
-      <ul className="mt-1 space-y-0.5">
-        {cards.map((card, i) => (
-          <li key={`${card.name}-${i}`} className="text-sm text-white">
-            {card.name}
-            {card.foil && <span className="ml-1 text-[var(--color-mtg-gold)]">✦</span>}
-          </li>
-        ))}
-      </ul>
-    </div>
+    <ul className="space-y-0.5">
+      {cards.map((card, i) => (
+        <li key={`${card.instanceId ?? card.name}-${i}`} className="text-sm text-white">
+          {card.name}
+          {card.ultrafoil && <span className="ml-1 text-cyan-300">◈</span>}
+          {card.foil && !card.ultrafoil && <span className="ml-1 text-[var(--color-mtg-gold)]">✦</span>}
+        </li>
+      ))}
+    </ul>
   )
 }
 
@@ -87,14 +76,19 @@ function TradeCard({
         )}
       </div>
 
-      <div className="mt-4 grid gap-4 sm:grid-cols-2">
-        <CardList label="Offering" cards={trade.offering} />
-        <CardList label="Wanting" cards={trade.wanting} />
+      <div className="mt-4">
+        <p className="text-xs font-medium uppercase tracking-wide text-[var(--color-mtg-muted)]">
+          Offering
+        </p>
+        <div className="mt-1">
+          <OfferingList cards={trade.offering} />
+        </div>
       </div>
 
       {trade.note && (
-        <p className="mt-3 rounded-lg bg-[var(--color-mtg-bg)] px-3 py-2 text-sm text-[var(--color-mtg-muted)]">
-          {trade.note}
+        <p className="mt-3 rounded-lg bg-[var(--color-mtg-bg)] px-3 py-2 text-sm">
+          <span className="font-medium text-[var(--color-mtg-gold)]">Asking: </span>
+          <span className="text-white">{trade.note}</span>
         </p>
       )}
     </article>
@@ -150,7 +144,7 @@ export function TradeTab() {
             Trade
           </h2>
           <p className="mt-1 text-sm text-[var(--color-mtg-muted)]">
-            Post trades and browse what other players are offering.
+            Post cards from your collection and browse other players&apos; listings.
           </p>
         </div>
         <button

@@ -38,12 +38,11 @@ export async function fetchTrades(query = ''): Promise<TradePost[]> {
 
 export async function createTrade(payload: {
   offering: TradeCardEntry[]
-  wanting: TradeCardEntry[]
   note?: string
 }): Promise<TradePost> {
   const data = await apiFetch<CreateTradeResponse>('/api/trades', {
     method: 'POST',
-    body: JSON.stringify(payload),
+    body: JSON.stringify({ offering: payload.offering, wanting: [], note: payload.note }),
   })
   return data.trade
 }

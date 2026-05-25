@@ -1,6 +1,8 @@
 export type TradeCardEntry = {
   name: string
+  instanceId?: string
   foil?: boolean
+  ultrafoil?: boolean
 }
 
 export type TradePost = {

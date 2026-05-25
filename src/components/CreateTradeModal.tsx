@@ -1,9 +1,11 @@
 import { useMemo, useState } from 'react'
-import { suggestCardNames } from '../lib/card-name-resolve'
 import { createTrade } from '../lib/trade-api'
 import type { CollectedCard } from '../types/game'
 import type { TradeCardEntry } from '../types/trade'
-import { SuggestionList } from '../tabs/minigame-shared'
+
+function cardKey(entry: Pick<TradeCardEntry, 'instanceId' | 'name' | 'foil' | 'ultrafoil'>) {
+  return entry.instanceId ?? `${entry.name}:${entry.foil}:${entry.ultrafoil}`
+}
 
 function CardChip({
   entry,
@@ -15,7 +17,8 @@ function CardChip({
   return (
     <span className="inline-flex items-center gap-1 rounded-full border border-[var(--color-mtg-border)] bg-[var(--color-mtg-bg)] px-2.5 py-1 text-xs text-white">
       {entry.name}
-      {entry.foil && <span className="text-[var(--color-mtg-gold)]">✦</span>}
+      {entry.ultrafoil && <span className="text-cyan-300">◈</span>}
+      {entry.foil && !entry.ultrafoil && <span className="text-[var(--color-mtg-gold)]">✦</span>}
       <button
         type="button"
         onClick={onRemove}
@@ -28,81 +31,78 @@ function CardChip({
   )
 }
 
-function CardListEditor({
-  label,
-  cards,
+function CollectionPicker({
+  collection,
+  selected,
   onChange,
-  inventory,
 }: {
-  label: string
-  cards: TradeCardEntry[]
+  collection: CollectedCard[]
+  selected: TradeCardEntry[]
   onChange: (next: TradeCardEntry[]) => void
-  inventory?: CollectedCard[]
 }) {
-  const [query, setQuery] = useState('')
-  const suggestions = useMemo(() => suggestCardNames(query), [query])
+  const selectedIds = useMemo(
+    () => new Set(selected.map((entry) => entry.instanceId).filter(Boolean)),
+    [selected],
+  )
 
-  function addCard(name: string, foil = false) {
-    const trimmed = name.trim()
-    if (!trimmed) return
-    if (cards.some((c) => c.name.toLowerCase() === trimmed.toLowerCase() && Boolean(c.foil) === foil)) {
-      return
-    }
-    onChange([...cards, { name: trimmed, foil: foil || undefined }])
-    setQuery('')
+  const available = useMemo(
+    () => collection.filter((card) => !selectedIds.has(card.instanceId)),
+    [collection, selectedIds],
+  )
+
+  function addFromCollection(card: CollectedCard) {
+    onChange([
+      ...selected,
+      {
+        name: card.name,
+        instanceId: card.instanceId,
+        foil: card.foil || undefined,
+        ultrafoil: card.ultrafoil || undefined,
+      },
+    ])
   }
 
   return (
     <div className="rounded-lg border border-[var(--color-mtg-border)] bg-[var(--color-mtg-bg)] p-3">
-      <p className="text-sm font-medium text-white">{label}</p>
-      <div className="relative mt-2">
-        <input
-          type="text"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              e.preventDefault()
-              addCard(query)
-            }
-          }}
-          placeholder="Search card name…"
-          className="w-full rounded-lg border border-[var(--color-mtg-border)] bg-[var(--color-mtg-panel)] px-3 py-2 text-sm text-white focus:border-[var(--color-mtg-gold)] focus:outline-none"
-        />
-        <SuggestionList items={suggestions} onPick={(name) => addCard(name)} />
-      </div>
+      <p className="text-sm font-medium text-white">Select from collection</p>
 
-      {inventory && inventory.length > 0 && (
-        <details className="mt-2">
-          <summary className="cursor-pointer text-xs text-[var(--color-mtg-muted)] hover:text-white">
-            Pick from inventory
-          </summary>
-          <ul className="mt-2 max-h-32 space-y-1 overflow-y-auto">
-            {inventory.slice(0, 40).map((card) => (
-              <li key={card.instanceId}>
-                <button
-                  type="button"
-                  onClick={() => addCard(card.name, card.foil)}
-                  className="w-full rounded px-2 py-1 text-left text-xs text-[var(--color-mtg-muted)] hover:bg-[var(--color-mtg-panel)] hover:text-white"
-                >
-                  {card.name}
-                  {card.foil && <span className="ml-1 text-[var(--color-mtg-gold)]">✦</span>}
-                </button>
-              </li>
-            ))}
-          </ul>
-        </details>
+      {collection.length === 0 ? (
+        <p className="mt-2 text-xs text-[var(--color-mtg-muted)]">
+          Your collection is empty. Open packs in the Shop first.
+        </p>
+      ) : available.length === 0 ? (
+        <p className="mt-2 text-xs text-[var(--color-mtg-muted)]">
+          All collection cards are already in this trade.
+        </p>
+      ) : (
+        <ul className="mt-2 max-h-48 space-y-1 overflow-y-auto rounded-lg border border-[var(--color-mtg-border)] bg-[var(--color-mtg-panel)] p-1">
+          {available.map((card) => (
+            <li key={card.instanceId}>
+              <button
+                type="button"
+                onClick={() => addFromCollection(card)}
+                className="w-full rounded px-2 py-1.5 text-left text-sm text-[var(--color-mtg-muted)] hover:bg-[var(--color-mtg-bg)] hover:text-white"
+              >
+                {card.name}
+                {card.ultrafoil && <span className="ml-1 text-cyan-300">◈</span>}
+                {card.foil && !card.ultrafoil && <span className="ml-1 text-[var(--color-mtg-gold)]">✦</span>}
+              </button>
+            </li>
+          ))}
+        </ul>
       )}
 
       <div className="mt-3 flex flex-wrap gap-2">
-        {cards.length === 0 ? (
-          <p className="text-xs text-[var(--color-mtg-muted)]">No cards added yet.</p>
+        {selected.length === 0 ? (
+          <p className="text-xs text-[var(--color-mtg-muted)]">No cards selected yet.</p>
         ) : (
-          cards.map((entry, i) => (
+          selected.map((entry) => (
             <CardChip
-              key={`${entry.name}-${entry.foil ?? false}-${i}`}
+              key={cardKey(entry)}
               entry={entry}
-              onRemove={() => onChange(cards.filter((_, idx) => idx !== i))}
+              onRemove={() =>
+                onChange(selected.filter((item) => cardKey(item) !== cardKey(entry)))
+              }
             />
           ))
         )}
@@ -121,7 +121,6 @@ export function CreateTradeModal({
   onCreated: () => void
 }) {
   const [offering, setOffering] = useState<TradeCardEntry[]>([])
-  const [wanting, setWanting] = useState<TradeCardEntry[]>([])
   const [note, setNote] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -133,7 +132,6 @@ export function CreateTradeModal({
     try {
       await createTrade({
         offering,
-        wanting,
         note: note.trim() || undefined,
       })
       onCreated()
@@ -154,7 +152,7 @@ export function CreateTradeModal({
               Post a trade
             </h2>
             <p className="mt-1 text-sm text-[var(--color-mtg-muted)]">
-              List what you have and what you want.
+              List cards from your collection and what you want for them.
             </p>
           </div>
           <button
@@ -168,22 +166,16 @@ export function CreateTradeModal({
         </div>
 
         <form onSubmit={(e) => void handleSubmit(e)} className="space-y-4">
-          <CardListEditor
-            label="Offering"
-            cards={offering}
-            onChange={setOffering}
-            inventory={collection}
-          />
-          <CardListEditor label="Wanting" cards={wanting} onChange={setWanting} />
+          <CollectionPicker collection={collection} selected={offering} onChange={setOffering} />
 
           <label className="block text-sm">
-            <span className="text-[var(--color-mtg-muted)]">Note (optional)</span>
-            <textarea
+            <span className="text-[var(--color-mtg-muted)]">Asking (optional)</span>
+            <input
+              type="text"
               value={note}
               onChange={(e) => setNote(e.target.value)}
               maxLength={500}
-              rows={2}
-              placeholder="Ship to US, prefer NM, etc."
+              placeholder="1000 mana, ultrafoil only, etc."
               className="mt-1 w-full rounded-lg border border-[var(--color-mtg-border)] bg-[var(--color-mtg-bg)] px-3 py-2 text-sm text-white focus:border-[var(--color-mtg-gold)] focus:outline-none"
             />
           </label>
@@ -192,7 +184,7 @@ export function CreateTradeModal({
 
           <button
             type="submit"
-            disabled={busy || (offering.length === 0 && wanting.length === 0)}
+            disabled={busy || offering.length === 0}
             className="w-full rounded-lg bg-[var(--color-mtg-gold)] py-2.5 text-sm font-semibold text-black transition hover:brightness-110 disabled:opacity-50"
           >
             {busy ? 'Posting…' : 'Post trade'}

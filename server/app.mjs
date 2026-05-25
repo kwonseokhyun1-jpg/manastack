@@ -185,7 +185,9 @@ function normalizeTradeCards(raw) {
     if (!name) continue
     out.push({
       name,
+      instanceId: item?.instanceId ? String(item.instanceId) : undefined,
       foil: Boolean(item?.foil),
+      ultrafoil: Boolean(item?.ultrafoil),
     })
   }
   return out
@@ -204,15 +206,14 @@ app.get('/api/trades', async (req, res) => {
 
 app.post('/api/trades', authMiddleware, async (req, res) => {
   const offering = normalizeTradeCards(req.body?.offering)
-  const wanting = normalizeTradeCards(req.body?.wanting)
   const note = String(req.body?.note ?? '').trim().slice(0, 500)
 
-  if (offering.length === 0 && wanting.length === 0) {
-    res.status(400).json({ error: 'Add at least one card to offer or want.' })
+  if (offering.length === 0) {
+    res.status(400).json({ error: 'Select at least one card from your collection.' })
     return
   }
-  if (offering.length > 30 || wanting.length > 30) {
-    res.status(400).json({ error: 'Maximum 30 cards per side.' })
+  if (offering.length > 30) {
+    res.status(400).json({ error: 'Maximum 30 cards per trade.' })
     return
   }
 
@@ -228,7 +229,7 @@ app.post('/api/trades', authMiddleware, async (req, res) => {
       id,
       req.userId,
       JSON.stringify(offering),
-      JSON.stringify(wanting),
+      JSON.stringify([]),
       note || null,
     )
 
@@ -238,7 +239,7 @@ app.post('/api/trades', authMiddleware, async (req, res) => {
         userId: req.userId,
         username: user.username ?? null,
         offering,
-        wanting,
+        wanting: [],
         note: note || undefined,
         createdAt: Date.now(),
       },
