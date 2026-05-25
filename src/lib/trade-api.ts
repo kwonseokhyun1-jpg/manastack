@@ -1,5 +1,5 @@
 import { getStoredToken } from './auth-api'
-import type { TradeCardEntry, TradePost } from '../types/trade'
+import type { TradeCardEntry, TradeOffer, TradePost } from '../types/trade'
 
 type TradesResponse = {
   trades: TradePost[]
@@ -7,6 +7,14 @@ type TradesResponse = {
 
 type CreateTradeResponse = {
   trade: TradePost
+}
+
+type OffersResponse = {
+  offers: TradeOffer[]
+}
+
+type CreateOfferResponse = {
+  offer: TradeOffer
 }
 
 function requestSignal(timeoutMs: number, existing?: AbortSignal | null): AbortSignal {
@@ -71,4 +79,43 @@ export async function createTrade(payload: {
 
 export async function deleteTrade(id: string): Promise<void> {
   await apiFetch(`/api/trades/${encodeURIComponent(id)}`, { method: 'DELETE' })
+}
+
+export async function fetchTradeOffers(tradeId: string): Promise<TradeOffer[]> {
+  const data = await apiFetch<OffersResponse>(
+    `/api/trades/${encodeURIComponent(tradeId)}/offers`,
+  )
+  return data.offers
+}
+
+export async function createTradeOffer(
+  tradeId: string,
+  payload: {
+    mana: number
+    cards: TradeCardEntry[]
+    note?: string
+  },
+): Promise<TradeOffer> {
+  if (!getStoredToken()) {
+    throw new Error('Log in to make an offer.')
+  }
+
+  const cards = payload.cards.filter((entry) => entry.name.trim())
+  const mana = Math.max(0, Math.floor(payload.mana))
+  if (mana === 0 && cards.length === 0) {
+    throw new Error('Add mana, cards, or both to your offer.')
+  }
+
+  const data = await apiFetch<CreateOfferResponse>(
+    `/api/trades/${encodeURIComponent(tradeId)}/offers`,
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        mana,
+        cards,
+        note: payload.note,
+      }),
+    },
+  )
+  return data.offer
 }

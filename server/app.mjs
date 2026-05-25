@@ -260,4 +260,81 @@ app.delete('/api/trades/:id', authMiddleware, async (req, res) => {
   })
 })
 
+function normalizeMana(raw) {
+  const value = Number(raw)
+  if (!Number.isFinite(value) || value < 0) return 0
+  return Math.floor(value)
+}
+
+app.get('/api/trades/:id/offers', async (req, res) => {
+  const tradeId = String(req.params.id ?? '')
+
+  await withDb(res, async (db) => {
+    const trade = await db.getTradeById(tradeId)
+    if (!trade) {
+      res.status(404).json({ error: 'Trade not found.' })
+      return
+    }
+    const offers = await db.listTradeOffers(tradeId)
+    res.json({ offers })
+  })
+})
+
+app.post('/api/trades/:id/offers', authMiddleware, async (req, res) => {
+  const tradeId = String(req.params.id ?? '')
+  const cards = normalizeTradeCards(req.body?.cards)
+  const mana = normalizeMana(req.body?.mana)
+  const note = String(req.body?.note ?? '').trim().slice(0, 500)
+
+  if (mana === 0 && cards.length === 0) {
+    res.status(400).json({ error: 'Add mana, cards, or both to your offer.' })
+    return
+  }
+  if (cards.length > 30) {
+    res.status(400).json({ error: 'Maximum 30 cards per offer.' })
+    return
+  }
+
+  await withDb(res, async (db) => {
+    const trade = await db.getTradeById(tradeId)
+    if (!trade) {
+      res.status(404).json({ error: 'Trade not found.' })
+      return
+    }
+    if (trade.userId === req.userId) {
+      res.status(400).json({ error: 'You cannot make an offer on your own trade.' })
+      return
+    }
+
+    const user = await db.findUserById(req.userId)
+    if (!user) {
+      res.status(401).json({ error: 'User not found.' })
+      return
+    }
+
+    const id = crypto.randomUUID()
+    await db.createTradeOffer(
+      id,
+      tradeId,
+      req.userId,
+      mana,
+      JSON.stringify(cards),
+      note || null,
+    )
+
+    res.status(201).json({
+      offer: {
+        id,
+        tradeId,
+        userId: req.userId,
+        username: user.username ?? null,
+        mana,
+        cards,
+        note: note || undefined,
+        createdAt: Date.now(),
+      },
+    })
+  })
+})
+
 export default app

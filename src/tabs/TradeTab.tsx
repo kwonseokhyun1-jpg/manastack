@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useGame } from '../context/GameContext'
 import { CreateTradeModal } from '../components/CreateTradeModal'
+import { TradeOfferModal } from '../components/TradeOfferModal'
 import { deleteTrade, fetchTrades } from '../lib/trade-api'
 import type { TradeCardEntry, TradePost } from '../types/trade'
 
@@ -38,15 +39,18 @@ function OfferingList({ cards }: { cards: TradeCardEntry[] }) {
 function TradeCard({
   trade,
   isOwn,
+  onOpen,
   onDelete,
 }: {
   trade: TradePost
   isOwn: boolean
+  onOpen: (trade: TradePost) => void
   onDelete: (id: string) => void
 }) {
   const [busy, setBusy] = useState(false)
 
-  async function handleDelete() {
+  async function handleDelete(e: React.MouseEvent) {
+    e.stopPropagation()
     if (!confirm('Remove this trade post?')) return
     setBusy(true)
     try {
@@ -58,22 +62,36 @@ function TradeCard({
   }
 
   return (
-    <article className="rounded-xl border border-[var(--color-mtg-border)] bg-[var(--color-mtg-panel)] p-4">
+    <article
+      className="cursor-pointer rounded-xl border border-[var(--color-mtg-border)] bg-[var(--color-mtg-panel)] p-4 transition hover:border-[var(--color-mtg-gold-dim)] hover:bg-[var(--color-mtg-panel)]/90"
+      onClick={() => onOpen(trade)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          onOpen(trade)
+        }
+      }}
+      role="button"
+      tabIndex={0}
+    >
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="font-semibold text-white">{trade.username ?? 'Unknown player'}</p>
           <p className="text-xs text-[var(--color-mtg-muted)]">{formatRelativeTime(trade.createdAt)}</p>
         </div>
-        {isOwn && (
-          <button
-            type="button"
-            onClick={() => void handleDelete()}
-            disabled={busy}
-            className="rounded-lg border border-[var(--color-mtg-border)] px-2 py-1 text-xs text-[var(--color-mtg-muted)] transition hover:border-red-500/50 hover:text-red-300 disabled:opacity-50"
-          >
-            {busy ? '…' : 'Delete'}
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-[var(--color-mana-u)]">View / offer</span>
+          {isOwn && (
+            <button
+              type="button"
+              onClick={(e) => void handleDelete(e)}
+              disabled={busy}
+              className="rounded-lg border border-[var(--color-mtg-border)] px-2 py-1 text-xs text-[var(--color-mtg-muted)] transition hover:border-red-500/50 hover:text-red-300 disabled:opacity-50"
+            >
+              {busy ? '…' : 'Delete'}
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="mt-4">
@@ -103,7 +121,8 @@ export function TradeTab() {
   const [trades, setTrades] = useState<TradePost[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [modalOpen, setModalOpen] = useState(false)
+  const [createModalOpen, setCreateModalOpen] = useState(false)
+  const [selectedTrade, setSelectedTrade] = useState<TradePost | null>(null)
 
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedQuery(query), 300)
@@ -133,7 +152,11 @@ export function TradeTab() {
       openAuthModal()
       return
     }
-    setModalOpen(true)
+    setCreateModalOpen(true)
+  }
+
+  function handleOpenTrade(trade: TradePost) {
+    setSelectedTrade(trade)
   }
 
   return (
@@ -144,7 +167,7 @@ export function TradeTab() {
             Trade
           </h2>
           <p className="mt-1 text-sm text-[var(--color-mtg-muted)]">
-            Post cards from your collection and browse other players&apos; listings.
+            Post cards from your collection, browse listings, and make offers with mana or cards.
           </p>
         </div>
         <button
@@ -191,16 +214,29 @@ export function TradeTab() {
             key={trade.id}
             trade={trade}
             isOwn={user?.id === trade.userId}
-            onDelete={(id) => setTrades((prev) => prev.filter((t) => t.id !== id))}
+            onOpen={handleOpenTrade}
+            onDelete={(id) => {
+              setTrades((prev) => prev.filter((t) => t.id !== id))
+              if (selectedTrade?.id === id) setSelectedTrade(null)
+            }}
           />
         ))}
       </div>
 
-      {modalOpen && (
+      {createModalOpen && (
         <CreateTradeModal
           collection={collection}
-          onClose={() => setModalOpen(false)}
+          onClose={() => setCreateModalOpen(false)}
           onCreated={() => void loadTrades(debouncedQuery)}
+        />
+      )}
+
+      {selectedTrade && (
+        <TradeOfferModal
+          trade={selectedTrade}
+          collection={collection}
+          onClose={() => setSelectedTrade(null)}
+          onOfferCreated={() => void loadTrades(debouncedQuery)}
         />
       )}
     </div>

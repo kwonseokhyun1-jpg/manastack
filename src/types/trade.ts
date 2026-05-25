@@ -14,3 +14,14 @@ export type TradePost = {
   note?: string
   createdAt: number
 }
+
+export type TradeOffer = {
+  id: string
+  tradeId: string
+  userId: string
+  username: string | null
+  mana: number
+  cards: TradeCardEntry[]
+  note?: string
+  createdAt: number
+}

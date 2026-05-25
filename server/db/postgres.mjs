@@ -57,6 +57,22 @@ export async function ensureSchema() {
     CREATE INDEX IF NOT EXISTS idx_trades_created ON trades(created_at DESC)
   `
 
+  await sql`
+    CREATE TABLE IF NOT EXISTS trade_offers (
+      id TEXT PRIMARY KEY,
+      trade_id TEXT NOT NULL REFERENCES trades(id) ON DELETE CASCADE,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      mana INTEGER NOT NULL DEFAULT 0,
+      cards TEXT NOT NULL,
+      note TEXT,
+      created_at BIGINT NOT NULL
+    )
+  `
+
+  await sql`
+    CREATE INDEX IF NOT EXISTS idx_trade_offers_trade ON trade_offers(trade_id, created_at DESC)
+  `
+
   schemaReady = true
 }
 
@@ -179,4 +195,38 @@ export async function getTradeById(id) {
     WHERE t.id = ${id}
   `
   return mapTradeRow(rows[0])
+}
+
+function mapOfferRow(row) {
+  if (!row) return null
+  return {
+    id: row.id,
+    tradeId: row.trade_id,
+    userId: row.user_id,
+    username: row.username ?? null,
+    mana: Number(row.mana),
+    cards: JSON.parse(row.cards),
+    note: row.note ?? undefined,
+    createdAt: Number(row.created_at),
+  }
+}
+
+export async function listTradeOffers(tradeId) {
+  await ensureSchema()
+  const rows = await sql`
+    SELECT o.id, o.trade_id, o.user_id, o.mana, o.cards, o.note, o.created_at, u.username
+    FROM trade_offers o
+    JOIN users u ON u.id = o.user_id
+    WHERE o.trade_id = ${tradeId}
+    ORDER BY o.created_at DESC
+  `
+  return rows.map(mapOfferRow)
+}
+
+export async function createTradeOffer(id, tradeId, userId, mana, cardsJson, note) {
+  await ensureSchema()
+  await sql`
+    INSERT INTO trade_offers (id, trade_id, user_id, mana, cards, note, created_at)
+    VALUES (${id}, ${tradeId}, ${userId}, ${mana}, ${cardsJson}, ${note ?? null}, ${Date.now()})
+  `
 }
