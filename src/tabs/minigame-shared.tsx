@@ -441,7 +441,9 @@ export function useMinigamePools(
     return () => {
       cancelled = true
     }
-  }, [filterPool])
+    // filterPool is always a stable module-level function (buildPool, buildUnscramblePool, etc.)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   return { allCards, easyPool, loading, loadError }
 }

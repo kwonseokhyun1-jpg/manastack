@@ -1,7 +1,7 @@
-import type { CardRecord } from '../types/card'
+import type { CardRecord, CardRarity } from '../types/card'
 import { getRarityForName } from './rarity-db'
 
-export type CardRarity = 'common' | 'uncommon' | 'rare' | 'mythic'
+export type { CardRarity }
 
 export const MAX_RARE_OR_MYTHIC_PER_PACK = 2
 
@@ -20,17 +20,32 @@ export function normalizeGathererRarity(raw: string): CardRarity {
   return 'common'
 }
 
+/** Scryfall / Gatherer-style rarity strings. */
+export function normalizeScryfallRarity(raw: string | undefined | null): CardRarity {
+  const value = String(raw ?? '').trim().toLowerCase()
+  if (value === 'mythic') return 'mythic'
+  if (value === 'rare') return 'rare'
+  if (value === 'uncommon') return 'uncommon'
+  if (value === 'special' || value === 'bonus') return 'rare'
+  return 'common'
+}
+
 export function getCardRarity(
   card: CardRecord,
   rarityMap: Map<string, CardRarity>,
 ): CardRarity {
+  if (card.rarity) return card.rarity
   return getRarityForName(card.name, rarityMap)
 }
 
 export function getCollectedCardRarity(
   name: string,
   rarityMap: Map<string, CardRarity>,
+  record?: CardRecord | null,
+  liveRarity?: string | null,
 ): CardRarity {
+  if (record?.rarity) return record.rarity
+  if (liveRarity) return normalizeScryfallRarity(liveRarity)
   return getRarityForName(name, rarityMap)
 }
 

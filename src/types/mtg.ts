@@ -27,6 +27,7 @@ export type ScryfallCard = {
   }
   legalities: Record<string, string>
   edhrec_rank?: number
+  rarity?: string
   set_name?: string
   collector_number?: string
   tcgplayer_id?: number

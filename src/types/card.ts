@@ -1,5 +1,7 @@
 import type { ManaColor } from './mtg'
 
+export type CardRarity = 'common' | 'uncommon' | 'rare' | 'mythic'
+
 export type CardFace = {
   name: string
   type_line: string
@@ -24,6 +26,7 @@ export type CardRecord = {
   edhrec_rank?: number
   game_changer?: boolean
   prices?: { usd?: string | null; usd_foil?: string | null }
+  rarity?: CardRarity
   card_faces?: CardFace[]
 }
 

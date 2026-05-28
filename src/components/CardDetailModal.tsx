@@ -58,7 +58,12 @@ export function CardDetailModal({ card, onClose, activeFolderId }: CardDetailMod
 
   const lookup = useMemo(() => buildCardLookup(cardPool), [cardPool])
   const record = lookup.get(canonicalNameKey(resolved.name))
-  const rarity = getCollectedCardRarity(resolved.name, rarityMap)
+  const rarity = getCollectedCardRarity(
+    resolved.name,
+    rarityMap,
+    record,
+    liveCard?.rarity,
+  )
   const colors = sortIdentity(record?.color_identity ?? [])
 
   useEffect(() => {
@@ -136,7 +141,7 @@ export function CardDetailModal({ card, onClose, activeFolderId }: CardDetailMod
         </div>
 
         <div className="p-4">
-          <div className="mx-auto max-w-[14rem] overflow-hidden rounded-lg border border-[var(--color-mtg-border)]">
+          <div className="mx-auto max-w-[11rem] overflow-hidden rounded-lg border border-[var(--color-mtg-border)]">
             {resolved.image ? (
               <img
                 src={resolved.image}

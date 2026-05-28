@@ -39,11 +39,13 @@ type RoundState = {
   manaEarned?: number
 }
 
-function getArtCropImage(card: CardRecord): string | undefined {
-  const normal = getCardImage(card)
-  if (!normal) return undefined
-  if (normal.includes('/art_crop/')) return normal
-  return normal.replace(/\/(normal|large|png|small)\//, '/art_crop/')
+function getArtZoomImage(card: CardRecord): string | undefined {
+  return getCardImage(card)
+}
+
+function toArtCropUrl(image: string): string {
+  if (image.includes('/art_crop/')) return image
+  return image.replace(/\/(normal|large|png|small)\//, '/art_crop/')
 }
 
 function clampFocal(x: number, y: number, revealPct: number): { x: number; y: number } {
@@ -58,12 +60,12 @@ function newRound(pool: CardRecord[], previous?: CardRecord): RoundState {
   const card = pickRandomCard(pool, previous)
   return {
     card,
-    focalX: 10 + Math.random() * 80,
-    focalY: 10 + Math.random() * 80,
+    focalX: 15 + Math.random() * 70,
+    focalY: 12 + Math.random() * 38,
     wrongGuesses: 0,
     guesses: [],
     phase: 'playing',
-    artImage: getArtCropImage(card),
+    artImage: getArtZoomImage(card),
   }
 }
 
@@ -74,9 +76,7 @@ async function resolvePopularArt(card: CardRecord): Promise<string | undefined> 
   if (popularArtCache.has(key)) return popularArtCache.get(key)
 
   const remote = await getMostPopularPrintingArt(card.name)
-  const image = remote?.image
-    ? getArtCropImage({ ...card, image: remote.image })
-    : getArtCropImage(card)
+  const image = remote?.image ?? getCardImage(card)
   popularArtCache.set(key, image)
   return image
 }
@@ -150,7 +150,7 @@ export function ArtGuessGame() {
 
   const loadRoundArt = useCallback(async (roundState: RoundState) => {
     const roundId = ++roundIdRef.current
-    const localArt = getArtCropImage(roundState.card)
+    const localArt = getArtZoomImage(roundState.card)
 
     const popularArt = await Promise.race([
       resolvePopularArt(roundState.card),
@@ -170,7 +170,7 @@ export function ArtGuessGame() {
   useEffect(() => {
     if (!round) return
     void loadRoundArt(round)
-  }, [round?.card.id, loadRoundArt, round])
+  }, [round?.card.id, loadRoundArt])
 
   const suggestions = useMemo(
     () => (showSuggestions ? suggestCardNames(guess) : []),
@@ -290,7 +290,7 @@ export function ArtGuessGame() {
       {round.phase === 'lost' && (
         <LoseBanner
           cardName={round.card.name}
-          image={artImage ?? image}
+          image={toArtCropUrl(artImage ?? image)}
           onNext={startNextRound}
         />
       )}

@@ -15,6 +15,15 @@ function canonicalCardName(name) {
   return trimmed
 }
 
+function normalizeScryfallRarity(raw) {
+  const value = String(raw ?? '').trim().toLowerCase()
+  if (value === 'mythic') return 'mythic'
+  if (value === 'rare') return 'rare'
+  if (value === 'uncommon') return 'uncommon'
+  if (value === 'special' || value === 'bonus') return 'rare'
+  return 'common'
+}
+
 function isStandardCard(card) {
   const type = (card.type_line ?? '').toLowerCase()
   if (type.includes('token') || type.includes('emblem')) return false
@@ -23,6 +32,7 @@ function isStandardCard(card) {
 }
 
 function slimCard(card) {
+  const rarity = normalizeScryfallRarity(card.rarity)
   return {
     id: card.id,
     name: canonicalCardName(card.name),
@@ -38,6 +48,7 @@ function slimCard(card) {
     scryfall_uri: card.scryfall_uri,
     edhrec_rank: card.edhrec_rank,
     prices: { usd: card.prices?.usd ?? null },
+    ...(rarity ? { rarity } : {}),
   }
 }
 

@@ -6,6 +6,7 @@ const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..')
 const cardsPath = path.join(root, 'public', 'data', 'cards.json')
 const outPath = path.join(root, 'public', 'rarity-map.json')
 const API = 'https://api.magicthegathering.io/v1/cards'
+const SCRYFALL_COLLECTION = 'https://api.scryfall.com/cards/collection'
 
 const RARITY_TIER = {
   common: 1,
@@ -30,6 +31,15 @@ function normalizeGathererRarity(raw) {
   if (value === 'uncommon') return 'uncommon'
   if (value === 'common' || value === 'basic land') return 'common'
   return null
+}
+
+function normalizeScryfallRarity(raw) {
+  const value = String(raw ?? '').trim().toLowerCase()
+  if (value === 'mythic') return 'mythic'
+  if (value === 'rare') return 'rare'
+  if (value === 'uncommon') return 'uncommon'
+  if (value === 'special' || value === 'bonus') return 'rare'
+  return 'common'
 }
 
 function pickModeRarity(counts) {
@@ -86,6 +96,45 @@ async function buildFromGatherer(neededKeys) {
   return countsByName
 }
 
+async function fetchScryfallRarities(nameByKey, unmatchedKeys) {
+  const names = [...unmatchedKeys]
+    .map((key) => nameByKey.get(key))
+    .filter(Boolean)
+
+  const rarities = new Map()
+  const batchSize = 75
+
+  for (let i = 0; i < names.length; i += batchSize) {
+    const batch = names.slice(i, i + batchSize)
+    const res = await fetch(SCRYFALL_COLLECTION, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({
+        identifiers: batch.map((name) => ({ name })),
+      }),
+    })
+
+    if (!res.ok) {
+      console.warn(`Scryfall collection batch failed (${res.status})`)
+      continue
+    }
+
+    const data = await res.json()
+    for (const card of data.data ?? []) {
+      const key = canonicalNameKey(card.name)
+      rarities.set(key, normalizeScryfallRarity(card.rarity))
+    }
+
+    if ((i / batchSize) % 10 === 0 && i > 0) {
+      console.log(`Scryfall fallback… ${Math.min(i + batchSize, names.length)}/${names.length}`)
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 100))
+  }
+
+  return rarities
+}
+
 async function main() {
   if (!fs.existsSync(cardsPath)) {
     console.warn('cards.json not found. Run npm run ensure-data first.')
@@ -94,29 +143,52 @@ async function main() {
 
   const cardsFile = JSON.parse(fs.readFileSync(cardsPath, 'utf8'))
   const neededKeys = new Set(cardsFile.cards.map((card) => canonicalNameKey(card.name)))
+  const nameByKey = new Map(
+    cardsFile.cards.map((card) => [canonicalNameKey(card.name), card.name]),
+  )
 
   console.log(`Building Gatherer rarity map for ${neededKeys.size} oracle names…`)
   const countsByName = await buildFromGatherer(neededKeys)
 
   const rarities = {}
+  const unmatched = []
   for (const key of neededKeys) {
     const counts = countsByName.get(key)
-    rarities[key] = counts ? pickModeRarity(counts) ?? 'common' : 'common'
+    if (counts) {
+      rarities[key] = pickModeRarity(counts) ?? 'common'
+    } else {
+      unmatched.push(key)
+      rarities[key] = 'common'
+    }
   }
 
-  const matched = [...neededKeys].filter((key) => countsByName.has(key)).length
+  let matchedScryfall = 0
+  if (unmatched.length > 0) {
+    console.log(`Gatherer missed ${unmatched.length} names — fetching Scryfall fallback…`)
+    const scryfallRarities = await fetchScryfallRarities(nameByKey, unmatched)
+    matchedScryfall = scryfallRarities.size
+    for (const [key, rarity] of scryfallRarities) {
+      rarities[key] = rarity
+    }
+  }
+
+  const matchedGatherer = [...neededKeys].filter((key) => countsByName.has(key)).length
   const payload = {
     updated_at: new Date().toISOString(),
-    source: 'gatherer',
-    api: 'https://api.magicthegathering.io/v1/cards',
+    source: 'gatherer+scryfall',
+    api: API,
     count: Object.keys(rarities).length,
-    matched,
+    matched_gatherer: matchedGatherer,
+    matched_scryfall: matchedScryfall,
+    matched: matchedGatherer + matchedScryfall,
     rarities,
   }
 
   fs.mkdirSync(path.dirname(outPath), { recursive: true })
   fs.writeFileSync(outPath, JSON.stringify(payload))
-  console.log(`Wrote ${outPath} (${matched}/${neededKeys.size} names matched in Gatherer)`)
+  console.log(
+    `Wrote ${outPath} (Gatherer ${matchedGatherer}, Scryfall ${matchedScryfall}, total ${payload.matched}/${neededKeys.size})`,
+  )
 }
 
 main().catch((err) => {

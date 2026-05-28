@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useGame } from '../context/GameContext'
-import { getCardByNameLocal, loadCardDatabase } from '../lib/card-db'
+import { getCardByNameLocal, loadMinigamePool } from '../lib/card-db'
 import {
   cardMatchesMission,
   DESCRIPTION_MATCH_MANA_MAX,
@@ -57,9 +57,9 @@ export function DescriptionMatchGame() {
   const startRound = useCallback((avoidId?: string) => {
     setLoading(true)
     setLoadError(null)
-    loadCardDatabase()
-      .then((db) => {
-        const next = pickDescriptionMission(db.cards, avoidId)
+    loadMinigamePool()
+      .then((cards) => {
+        const next = pickDescriptionMission(cards, avoidId)
         if (!next) {
           setLoadError('Could not build a mission from the card pool.')
           setLoading(false)
