@@ -9,3 +9,5 @@ public/data/*
 *.local
 
 .vercel
+.wrangler
+.dev.vars

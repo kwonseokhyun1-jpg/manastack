@@ -1,0 +1,19 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "manastack",
+  "main": "worker.mjs",
+  "compatibility_date": "2026-05-29",
+  "compatibility_flags": [
+    "nodejs_compat",
+    "enable_nodejs_http_server_modules"
+  ],
+  "vars": {
+    "DEPLOY_TARGET": "cloudflare"
+  },
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "single-page-application",
+    "binding": "ASSETS",
+    "run_worker_first": ["/api", "/api/*"]
+  }
+}

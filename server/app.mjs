@@ -52,7 +52,11 @@ async function withDb(res, handler) {
     return await handler(db)
   } catch (err) {
     console.error(err)
-    if (process.env.VERCEL && !process.env.POSTGRES_URL && !process.env.DATABASE_URL) {
+    if (
+      (process.env.VERCEL || process.env.DEPLOY_TARGET === 'cloudflare') &&
+      !process.env.POSTGRES_URL &&
+      !process.env.DATABASE_URL
+    ) {
       res.status(503).json({ error: dbUnavailableMessage() })
       return null
     }
