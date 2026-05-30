@@ -58,11 +58,6 @@ export function RuleTriviaGame() {
 
       setSessionCorrect((c) => c + 1)
 
-      if (manaRemaining <= 0) {
-        setAtDailyCap(true)
-        return
-      }
-
       const awarded = awardMinigameMana('rule-trivia', TRIVIA_MANA_PER_CORRECT)
       if (awarded > 0) {
         setJustEarnedMana(true)
@@ -70,7 +65,7 @@ export function RuleTriviaGame() {
         setAtDailyCap(true)
       }
     },
-    [phase, question.correctIndex, manaRemaining, awardMinigameMana],
+    [phase, question.correctIndex, awardMinigameMana],
   )
 
   const isCorrect = selected === question.correctIndex

@@ -1,5 +1,6 @@
 import { BULK_TRIVIA_QUESTIONS } from './bulk-questions'
 import { CORE_TRIVIA_QUESTIONS } from './core-questions'
+import { EXTRA_TRIVIA_QUESTIONS } from './extra-questions'
 import type { TriviaQuestion } from './types'
 
 function mergeQuestions(): TriviaQuestion[] {
@@ -8,6 +9,11 @@ function mergeQuestions(): TriviaQuestion[] {
     byId.set(question.id, question)
   }
   for (const question of BULK_TRIVIA_QUESTIONS) {
+    if (!byId.has(question.id)) {
+      byId.set(question.id, question)
+    }
+  }
+  for (const question of EXTRA_TRIVIA_QUESTIONS) {
     if (!byId.has(question.id)) {
       byId.set(question.id, question)
     }
