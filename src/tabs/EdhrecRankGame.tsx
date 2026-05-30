@@ -209,11 +209,6 @@ export function EdhrecRankGame() {
 
       setSessionCorrect((c) => c + 1)
 
-      if (manaRemaining <= 0) {
-        setAtDailyCap(true)
-        return
-      }
-
       const awarded = awardMinigameMana('edhrec-rank', RANK_GUESS_MANA_PER_CORRECT)
       if (awarded > 0) {
         setJustEarnedMana(true)
@@ -221,7 +216,7 @@ export function EdhrecRankGame() {
         setAtDailyCap(true)
       }
     },
-    [phase, pair, manaRemaining, awardMinigameMana],
+    [phase, pair, awardMinigameMana],
   )
 
   if (loading) return <MinigameLoading />

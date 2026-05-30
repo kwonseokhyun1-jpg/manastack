@@ -8,6 +8,7 @@ import {
   useState,
   type ReactNode,
 } from 'react'
+import { flushSync } from 'react-dom'
 import type { CardRecord } from '../types/card'
 import type { MinigameManaId, BoosterCard, CollectedCard, GameSave, ShowcaseFolder } from '../types/game'
 import {
@@ -240,17 +241,19 @@ export function GameProvider({ children }: { children: ReactNode }) {
 
   const minigameManaRemainingToday = useCallback(
     (gameId: MinigameManaId) => getMinigameManaRemainingToday(save, gameId),
-    [save.minigameManaCaps],
+    [save],
   )
 
   const awardMinigameMana = useCallback(
     (gameId: MinigameManaId, amount: number): number => {
       let awarded = 0
-      updateSave((prev) => {
-        const result = applyMinigameManaReward(prev, gameId, amount)
-        if (!result) return prev
-        awarded = result.awarded
-        return result.save
+      flushSync(() => {
+        updateSave((prev) => {
+          const result = applyMinigameManaReward(prev, gameId, amount)
+          if (!result) return prev
+          awarded = result.awarded
+          return result.save
+        })
       })
       return awarded
     },

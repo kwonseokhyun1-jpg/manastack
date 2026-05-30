@@ -10,7 +10,7 @@
     "patch:oracle": "node scripts/patch-oracle-from-scryfall-bulk.mjs",
     "build:standard": "node scripts/build-standard-pool.mjs",
     "build:sets": "node scripts/build-set-catalog.mjs",
-    "build:trivia": "node scripts/generate-trivia-bulk.mjs",
+    "build:trivia": "node scripts/generate-trivia-bulk.mjs && node scripts/generate-trivia-extra.mjs",
     "prebuild": "node scripts/ensure-vercel-data.mjs && node scripts/patch-oracle-from-scryfall-bulk.mjs",
     "build": "npm run build:trivia && tsc -b && vite build",
     "predev": "node scripts/ensure-data.mjs",

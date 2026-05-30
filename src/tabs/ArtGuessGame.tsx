@@ -25,7 +25,8 @@ import {
   type GamePhase,
 } from './minigame-shared'
 
-const REVEAL_LEVELS = [7, 14, 24, 38, 58]
+/** Percent of art visible per wrong guess — higher start = less zoomed in. */
+const REVEAL_LEVELS = [22, 34, 48, 62, 78]
 
 type RoundState = {
   card: CardRecord
@@ -40,7 +41,8 @@ type RoundState = {
 }
 
 function getArtZoomImage(card: CardRecord): string | undefined {
-  return getCardImage(card)
+  const image = getCardImage(card)
+  return image ? toArtCropUrl(image) : undefined
 }
 
 function toArtCropUrl(image: string): string {
@@ -60,8 +62,8 @@ function newRound(pool: CardRecord[], previous?: CardRecord): RoundState {
   const card = pickRandomCard(pool, previous)
   return {
     card,
-    focalX: 15 + Math.random() * 70,
-    focalY: 12 + Math.random() * 38,
+    focalX: 20 + Math.random() * 60,
+    focalY: 30 + Math.random() * 40,
     wrongGuesses: 0,
     guesses: [],
     phase: 'playing',
@@ -76,7 +78,8 @@ async function resolvePopularArt(card: CardRecord): Promise<string | undefined> 
   if (popularArtCache.has(key)) return popularArtCache.get(key)
 
   const remote = await getMostPopularPrintingArt(card.name)
-  const image = remote?.image ?? getCardImage(card)
+  const raw = remote?.image ?? getCardImage(card)
+  const image = raw ? toArtCropUrl(raw) : undefined
   popularArtCache.set(key, image)
   return image
 }
