@@ -133,14 +133,12 @@ function ManaCostLine({
       }
       i++
     }
-    return <span className="inline-flex items-center justify-center gap-0.5">{nodes}</span>
+    return <span className="inline-flex items-center justify-end gap-0.5">{nodes}</span>
   }
 
   const tokens = parseManaTokens(manaCost)
-  const masked = maskText(manaCost, successfulGuesses)
-
   return (
-    <span className="inline-flex flex-wrap items-center justify-center gap-x-3 text-neutral-600">
+    <span className="inline-flex flex-wrap items-center justify-end gap-0.5 text-neutral-600">
       {tokens.map((token, i) => {
         const inner = token.slice(1, -1)
         const tokenMasked = maskText(token, successfulGuesses)
@@ -155,15 +153,16 @@ function ManaCostLine({
             />
           )
         }
-        const width = Math.max(3, inner.length + 2)
         return (
-          <span key={i} className="tracking-[0.15em]">
-            {'_'.repeat(width)}
-          </span>
+          <span
+            key={i}
+            className="inline-block h-[18px] w-[18px] rounded-full border border-neutral-500 bg-neutral-300 shadow-[inset_1px_1px_2px_rgba(255,255,255,0.75),inset_-1px_-1px_2px_rgba(0,0,0,0.2)]"
+            aria-label={`Hidden mana symbol ${i + 1}`}
+          />
         )
       })}
       {tokens.length === 0 && (
-        <MaskedText text={masked.replace(/\{/g, '').replace(/\}/g, '') || '_____'} />
+        <span className="inline-block h-[18px] w-[18px] rounded-full border border-neutral-500 bg-neutral-300 shadow-[inset_1px_1px_2px_rgba(255,255,255,0.75),inset_-1px_-1px_2px_rgba(0,0,0,0.2)]" />
       )}
     </span>
   )

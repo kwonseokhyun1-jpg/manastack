@@ -142,3 +142,49 @@ body {
 .spellify-card {
   font-variant-ligatures: none;
 }
+
+.spellify-card-frame {
+  position: relative;
+  overflow: hidden;
+  background: var(--spellify-frame);
+}
+
+.spellify-card-frame::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 20% 10%, rgba(255, 255, 255, 0.55), transparent 9%),
+    radial-gradient(circle at 85% 18%, rgba(0, 0, 0, 0.28), transparent 11%),
+    radial-gradient(circle at 26% 76%, rgba(255, 255, 255, 0.36), transparent 13%),
+    linear-gradient(118deg, rgba(255, 255, 255, 0.2) 0 8%, transparent 8% 16%, rgba(0, 0, 0, 0.14) 16% 24%, transparent 24% 32%),
+    repeating-linear-gradient(62deg, rgba(255, 255, 255, 0.22) 0 2px, transparent 2px 8px);
+  opacity: 0.48;
+  pointer-events: none;
+  mix-blend-mode: overlay;
+}
+
+.spellify-card-frame > * {
+  position: relative;
+  z-index: 1;
+}
+
+.spellify-card-bar {
+  display: flex;
+  align-items: center;
+  border: 2px solid #202020;
+  border-radius: 9999px;
+  background: linear-gradient(180deg, #edf0f1 0%, #c7ccd0 48%, #edf0f1 100%);
+  box-shadow:
+    inset 1px 1px 2px rgba(255, 255, 255, 0.95),
+    inset -1px -1px 2px rgba(0, 0, 0, 0.28),
+    0 1px 0 rgba(255, 255, 255, 0.28);
+}
+
+.spellify-card-textbox {
+  border: 2px solid #5a5a55;
+  background: linear-gradient(180deg, #e4ecef 0%, #d1d9dc 100%);
+  box-shadow:
+    inset 1px 1px 2px rgba(255, 255, 255, 0.8),
+    inset -1px -1px 2px rgba(0, 0, 0, 0.18);
+}
