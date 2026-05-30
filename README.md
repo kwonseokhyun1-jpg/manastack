@@ -20,4 +20,13 @@ If card data is missing, run `npm run build:data` in `../website/mtg` first.
 2. **Shop** — Open a booster pack for 10 mana. Get 10 random Commander-legal cards (1 foil guaranteed, no duplicate non-foils).
 3. **Inventory** — View your collection and organize cards into showcase folders.
 
-Progress is saved in localStorage.
+Progress is saved in localStorage (and syncs to the cloud when signed in).
+
+## Deployment
+
+Production is hosted on **Vercel** only: https://manastack.vercel.app/
+
+- Connect the GitHub repo in the Vercel dashboard (or `npx vercel deploy --prod`).
+- Set `DATABASE_URL` (Postgres, e.g. Neon) and `JWT_SECRET` in Vercel environment variables.
+
+This project does not use Cloudflare Workers or Pages.
