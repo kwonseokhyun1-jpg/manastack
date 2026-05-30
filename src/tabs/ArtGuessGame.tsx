@@ -260,7 +260,12 @@ export function ArtGuessGame() {
         } ${!artImage ? 'bg-[var(--color-mtg-panel)]' : ''}`}
         style={
           artImage
-            ? artBackgroundStyle(artImage, revealPct, round.focalX, round.focalY)
+            ? artBackgroundStyle(
+                toArtCropUrl(artImage),
+                revealPct,
+                round.focalX,
+                round.focalY,
+              )
             : undefined
         }
         role="img"
