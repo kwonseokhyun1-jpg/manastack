@@ -12,6 +12,10 @@ async function loadDb() {
     return dbPromise
   }
 
+  if (process.env.DEPLOY_TARGET === 'cloudflare') {
+    throw new Error(dbUnavailableMessage())
+  }
+
   dbPromise = import('./sqlite.mjs')
   return dbPromise
 }
@@ -21,6 +25,9 @@ export async function getDb() {
 }
 
 export function dbUnavailableMessage() {
+  if (process.env.DEPLOY_TARGET === 'cloudflare' && !usePostgres()) {
+    return 'Cloudflare deploy needs Postgres. Set DATABASE_URL (e.g. Neon) as a Wrangler secret: wrangler secret put DATABASE_URL'
+  }
   if (process.env.VERCEL && !usePostgres()) {
     return 'Auth server needs a database. Add a Postgres database in Vercel Storage (Neon), connect it to this project, then redeploy.'
   }

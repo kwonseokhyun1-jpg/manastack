@@ -1,4 +1,5 @@
 import type { GameSave } from '../types/game'
+import { apiUrl } from './api-base'
 
 const TOKEN_KEY = 'manastack-auth-token'
 
@@ -19,7 +20,7 @@ type CloudSaveResponse = {
 }
 
 async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const res = await fetch(path, {
+  const res = await fetch(apiUrl(path), {
     ...options,
     signal: options.signal ?? AbortSignal.timeout(8000),
     headers: {

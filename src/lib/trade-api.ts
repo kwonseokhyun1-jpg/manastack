@@ -1,3 +1,4 @@
+import { apiUrl } from './api-base'
 import { getStoredToken } from './auth-api'
 import type { GameSave } from '../types/game'
 import type { TradeCardEntry, TradeInbox, TradeOffer, TradePost } from '../types/trade'
@@ -30,7 +31,7 @@ function requestSignal(timeoutMs: number, existing?: AbortSignal | null): AbortS
 
 async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = getStoredToken()
-  const res = await fetch(path, {
+  const res = await fetch(apiUrl(path), {
     ...options,
     signal: requestSignal(8000, options.signal),
     headers: {
