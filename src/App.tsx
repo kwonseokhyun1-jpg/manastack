@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Analytics } from '@vercel/analytics/react'
 import { AuthProvider } from './context/AuthContext'
 import { GameProvider } from './context/GameContext'
 import { AuthModal } from './components/AuthModal'
@@ -32,6 +33,7 @@ function App() {
       <GameProvider>
         <AppShell />
       </GameProvider>
+      <Analytics />
     </AuthProvider>
   )
 }
