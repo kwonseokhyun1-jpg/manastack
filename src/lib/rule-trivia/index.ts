@@ -1,29 +1,9 @@
-import { BULK_TRIVIA_QUESTIONS } from './bulk-questions'
-import { CORE_TRIVIA_QUESTIONS } from './core-questions'
-import { EXTRA_TRIVIA_QUESTIONS } from './extra-questions'
+import { TRIVIA_QUESTIONS } from './questions'
 import type { TriviaQuestion } from './types'
-
-function mergeQuestions(): TriviaQuestion[] {
-  const byId = new Map<string, TriviaQuestion>()
-  for (const question of CORE_TRIVIA_QUESTIONS) {
-    byId.set(question.id, question)
-  }
-  for (const question of BULK_TRIVIA_QUESTIONS) {
-    if (!byId.has(question.id)) {
-      byId.set(question.id, question)
-    }
-  }
-  for (const question of EXTRA_TRIVIA_QUESTIONS) {
-    if (!byId.has(question.id)) {
-      byId.set(question.id, question)
-    }
-  }
-  return [...byId.values()]
-}
 
 export type { TriviaQuestion } from './types'
 
-export const RULE_TRIVIA_QUESTIONS: TriviaQuestion[] = mergeQuestions()
+export const RULE_TRIVIA_QUESTIONS: TriviaQuestion[] = TRIVIA_QUESTIONS
 
 export function shuffleQuestions(questions: TriviaQuestion[]): TriviaQuestion[] {
   const copy = [...questions]
