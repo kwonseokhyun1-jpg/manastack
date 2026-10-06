@@ -4,6 +4,7 @@ import { GameProvider } from './context/GameContext'
 import { AuthModal } from './components/AuthModal'
 import { Layout, type TabId } from './components/Layout'
 import { MinigamesTab } from './tabs/MinigamesTab'
+import { PlaytestTab } from './tabs/PlaytestTab'
 import { ShopTab } from './tabs/ShopTab'
 import { InventoryTab } from './tabs/InventoryTab'
 import { ProfileTab } from './tabs/ProfileTab'
@@ -16,6 +17,7 @@ function AppShell() {
     <>
       <Layout active={tab} onTabChange={setTab}>
         {tab === 'minigames' && <MinigamesTab />}
+        {tab === 'playtest' && <PlaytestTab />}
         {tab === 'shop' && <ShopTab />}
         {tab === 'inventory' && <InventoryTab />}
         {tab === 'trade' && <TradeTab />}
