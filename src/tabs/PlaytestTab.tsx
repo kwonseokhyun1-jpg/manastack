@@ -1,8 +1,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { PlaytestGame } from '../components/PlaytestGame'
 import { loadCommanderRankPool, loadMinigamePool } from '../lib/card-db'
-import { parseDecklistText, parsedToResolved } from '../lib/decklist-parse'
+import {
+  extractMainboardText,
+  parseDecklistText,
+  parsedToResolved,
+} from '../lib/decklist-parse'
 import { generateBracketOpponentDeck } from '../lib/playtest-brackets'
+import {
+  getSavedDeck,
+  loadSavedDecks,
+  upsertSavedDeck,
+  type SavedDeck,
+} from '../lib/saved-decks'
 import type { CardRecord } from '../types/card'
 import type {
   CommanderBracket,
@@ -13,11 +23,8 @@ import { BRACKETS } from '../types/playtest'
 
 type Phase = 'setup' | 'play'
 
-const SAMPLE_DECKLIST = `Commander
-1 Atraxa, Praetors' Voice
-
-Deck
-1 Sol Ring
+const SAMPLE_COMMANDER = "Atraxa, Praetors' Voice"
+const SAMPLE_MAINBOARD = `1 Sol Ring
 1 Arcane Signet
 1 Command Tower
 1 Reliquary Tower
@@ -42,12 +49,23 @@ Deck
 10 Forest
 `
 
-export function PlaytestTab() {
+type PlaytestTabProps = {
+  initialSavedDeckId?: string | null
+  onConsumedInitialDeck?: () => void
+}
+
+export function PlaytestTab({
+  initialSavedDeckId = null,
+  onConsumedInitialDeck,
+}: PlaytestTabProps) {
   const [phase, setPhase] = useState<Phase>('setup')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [deckText, setDeckText] = useState('')
+  const [commanderName, setCommanderName] = useState('')
   const [deckName, setDeckName] = useState('My Deck')
+  const [selectedSavedId, setSelectedSavedId] = useState<string>('')
+  const [savedDecks, setSavedDecks] = useState<SavedDeck[]>([])
   const [parsed, setParsed] = useState<ParsedDecklist | null>(null)
   const [bracket, setBracket] = useState<CommanderBracket>(3)
   const [opponentPreview, setOpponentPreview] = useState<ResolvedDeck | null>(null)
@@ -55,10 +73,41 @@ export function PlaytestTab() {
   const [oppDeck, setOppDeck] = useState<ResolvedDeck | null>(null)
   const [matchKey, setMatchKey] = useState(0)
   const [regenBusy, setRegenBusy] = useState(false)
+  const [saveFlash, setSaveFlash] = useState(false)
 
   const allCardsRef = useRef<CardRecord[]>([])
   const commandersRef = useRef<CardRecord[]>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const refreshSaved = useCallback(() => {
+    setSavedDecks(loadSavedDecks())
+  }, [])
+
+  const parseCurrent = useCallback(
+    (text: string, commander: string, name = deckName) => {
+      if (!text.trim() && !commander.trim()) {
+        setParsed(null)
+        return
+      }
+      setParsed(
+        parseDecklistText(text, name, {
+          commanderName: commander.trim() || undefined,
+        }),
+      )
+    },
+    [deckName],
+  )
+
+  const applySavedDeck = useCallback(
+    (deck: SavedDeck) => {
+      setSelectedSavedId(deck.id)
+      setDeckName(deck.name)
+      setCommanderName(deck.commanderName)
+      setDeckText(deck.mainboardText)
+      parseCurrent(deck.mainboardText, deck.commanderName, deck.name)
+    },
+    [parseCurrent],
+  )
 
   useEffect(() => {
     let cancelled = false
@@ -72,6 +121,7 @@ export function PlaytestTab() {
         allCardsRef.current = cards
         commandersRef.current = commanders
         setOpponentPreview(generateBracketOpponentDeck(3, cards, commanders))
+        refreshSaved()
       } catch (e) {
         if (!cancelled) {
           setError(e instanceof Error ? e.message : 'Failed to load card data')
@@ -83,7 +133,14 @@ export function PlaytestTab() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [refreshSaved])
+
+  useEffect(() => {
+    if (loading || !initialSavedDeckId) return
+    const deck = getSavedDeck(initialSavedDeckId)
+    if (deck) applySavedDeck(deck)
+    onConsumedInitialDeck?.()
+  }, [loading, initialSavedDeckId, applySavedDeck, onConsumedInitialDeck])
 
   const regenerateOpponent = useCallback(
     (nextBracket: CommanderBracket = bracket) => {
@@ -112,20 +169,45 @@ export function PlaytestTab() {
     regenerateOpponent(next)
   }
 
-  const parseCurrentText = (text: string, name = deckName) => {
-    if (!text.trim()) {
-      setParsed(null)
-      return
-    }
-    setParsed(parseDecklistText(text, name))
-  }
-
   const onUploadFile = async (file: File) => {
     const text = await file.text()
     const nameFromFile = file.name.replace(/\.(txt|dek|cod|mtga?)$/i, '')
     setDeckName(nameFromFile || 'My Deck')
-    setDeckText(text)
-    parseCurrentText(text, nameFromFile || 'My Deck')
+    setSelectedSavedId('')
+
+    const preview = parseDecklistText(text, nameFromFile || 'My Deck')
+    const nextCommander = preview.commander?.name ?? commanderName
+    if (preview.commander?.name) setCommanderName(preview.commander.name)
+
+    const mainText = extractMainboardText(text)
+    setDeckText(mainText)
+    parseCurrent(mainText, nextCommander, nameFromFile || 'My Deck')
+  }
+
+  const onPickSaved = (id: string) => {
+    setSelectedSavedId(id)
+    if (!id) return
+    const deck = getSavedDeck(id)
+    if (deck) applySavedDeck(deck)
+  }
+
+  const saveCurrentToDecks = () => {
+    if (!deckText.trim() && !commanderName.trim()) {
+      setError('Enter a commander and mainboard before saving.')
+      return
+    }
+    const saved = upsertSavedDeck({
+      id: selectedSavedId || undefined,
+      name: deckName.trim() || 'Untitled Deck',
+      commanderName: commanderName.trim(),
+      mainboardText: deckText,
+    })
+    refreshSaved()
+    setSelectedSavedId(saved.id)
+    setDeckName(saved.name)
+    setError(null)
+    setSaveFlash(true)
+    window.setTimeout(() => setSaveFlash(false), 1600)
   }
 
   const resolvedYou = useMemo(
@@ -174,7 +256,7 @@ export function PlaytestTab() {
           Playtest
         </h2>
         <p className="mt-1 text-sm text-[var(--color-mtg-muted)]">
-          Upload a decklist and duel on a shared playtest table — the AI opponent plays the far
+          Pick a saved deck or paste a list, then duel on a shared table — the AI plays the far
           side each turn.
         </p>
       </div>
@@ -188,7 +270,7 @@ export function PlaytestTab() {
       <section className="rounded-xl border border-[var(--color-mtg-border)] bg-[var(--color-mtg-panel)] p-4 sm:p-5">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <h3 className="font-[family-name:var(--font-display)] text-lg text-white">
-            Your decklist
+            Your deck
           </h3>
           <div className="flex flex-wrap gap-2">
             <button
@@ -201,9 +283,11 @@ export function PlaytestTab() {
             <button
               type="button"
               onClick={() => {
+                setSelectedSavedId('')
                 setDeckName('Sample Deck')
-                setDeckText(SAMPLE_DECKLIST)
-                parseCurrentText(SAMPLE_DECKLIST, 'Sample Deck')
+                setCommanderName(SAMPLE_COMMANDER)
+                setDeckText(SAMPLE_MAINBOARD)
+                parseCurrent(SAMPLE_MAINBOARD, SAMPLE_COMMANDER, 'Sample Deck')
               }}
               className="rounded-lg border border-[var(--color-mtg-border)] px-3 py-1.5 text-sm text-[var(--color-mtg-muted)]"
             >
@@ -223,6 +307,28 @@ export function PlaytestTab() {
           />
         </div>
 
+        <label className="mb-2 block text-xs text-[var(--color-mtg-muted)]">
+          Saved deck
+        </label>
+        <select
+          value={selectedSavedId}
+          onChange={(e) => onPickSaved(e.target.value)}
+          className="mb-3 w-full rounded-lg border border-[var(--color-mtg-border)] bg-[var(--color-mtg-bg)] px-3 py-2 text-sm"
+        >
+          <option value="">Paste or upload below…</option>
+          {savedDecks.map((d) => (
+            <option key={d.id} value={d.id}>
+              {d.name}
+              {d.commanderName ? ` — ${d.commanderName}` : ''}
+            </option>
+          ))}
+        </select>
+        {savedDecks.length === 0 && (
+          <p className="mb-3 text-xs text-[var(--color-mtg-muted)]">
+            No saved decks yet. Add some in the Decks tab, or save the list below.
+          </p>
+        )}
+
         <label className="mb-2 block text-xs text-[var(--color-mtg-muted)]">Deck name</label>
         <input
           type="text"
@@ -231,17 +337,30 @@ export function PlaytestTab() {
           className="mb-3 w-full rounded-lg border border-[var(--color-mtg-border)] bg-[var(--color-mtg-bg)] px-3 py-2 text-sm"
         />
 
+        <label className="mb-2 block text-xs text-[var(--color-mtg-muted)]">Commander</label>
+        <input
+          type="text"
+          value={commanderName}
+          onChange={(e) => {
+            const next = e.target.value
+            setCommanderName(next)
+            parseCurrent(deckText, next)
+          }}
+          placeholder="Atraxa, Praetors' Voice"
+          className="mb-3 w-full rounded-lg border border-[var(--color-mtg-border)] bg-[var(--color-mtg-bg)] px-3 py-2 text-sm"
+        />
+
         <label className="mb-2 block text-xs text-[var(--color-mtg-muted)]">
-          Paste decklist (Arena / MTGO / 1 Card Name)
+          Mainboard (Arena / MTGO / 1 Card Name)
         </label>
         <textarea
           value={deckText}
           onChange={(e) => {
             setDeckText(e.target.value)
-            parseCurrentText(e.target.value)
+            parseCurrent(e.target.value, commanderName)
           }}
           rows={12}
-          placeholder={`Commander\n1 Your Commander\n\nDeck\n1 Sol Ring\n…`}
+          placeholder={`1 Sol Ring\n1 Arcane Signet\n1 Command Tower\n…`}
           className="w-full resize-y rounded-lg border border-[var(--color-mtg-border)] bg-[var(--color-mtg-bg)] px-3 py-2 font-mono text-xs leading-relaxed"
         />
 
@@ -272,6 +391,19 @@ export function PlaytestTab() {
             )}
           </div>
         )}
+
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={saveCurrentToDecks}
+            className="rounded-lg border border-[var(--color-mtg-gold-dim)] px-3 py-1.5 text-sm text-[var(--color-mtg-gold)]"
+          >
+            {selectedSavedId ? 'Update saved deck' : 'Save to Decks'}
+          </button>
+          {saveFlash && (
+            <span className="text-sm text-emerald-300/90">Saved — available in the Decks tab.</span>
+          )}
+        </div>
       </section>
 
       <section className="rounded-xl border border-[var(--color-mtg-border)] bg-[var(--color-mtg-panel)] p-4 sm:p-5">
@@ -342,7 +474,7 @@ export function PlaytestTab() {
       >
         Start duel
       </button>
-      {!canStart && deckText.trim() && (
+      {!canStart && (deckText.trim() || commanderName.trim()) && (
         <p className="text-center text-xs text-[var(--color-mtg-muted)]">
           Need at least 7 mainboard cards to start.
         </p>

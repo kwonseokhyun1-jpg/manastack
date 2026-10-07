@@ -2,10 +2,18 @@ import type { ReactNode } from 'react'
 import { AuthButton } from './AuthButton'
 import { ManaDisplay } from './ManaDisplay'
 
-export type TabId = 'minigames' | 'playtest' | 'shop' | 'inventory' | 'trade' | 'profile'
+export type TabId =
+  | 'minigames'
+  | 'decks'
+  | 'playtest'
+  | 'shop'
+  | 'inventory'
+  | 'trade'
+  | 'profile'
 
 const TABS: { id: TabId; label: string; icon: string }[] = [
   { id: 'minigames', label: 'Minigames', icon: '🎮' },
+  { id: 'decks', label: 'Decks', icon: '📋' },
   { id: 'playtest', label: 'Playtest', icon: '🃏' },
   { id: 'shop', label: 'Shop', icon: '🛒' },
   { id: 'inventory', label: 'Inventory', icon: '📚' },
