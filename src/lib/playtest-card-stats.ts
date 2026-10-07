@@ -92,16 +92,39 @@ export function isManaRock(card: CardRecord): boolean {
   )
 }
 
+function parseStat(value: string | undefined, fallback: number): number {
+  if (value == null || value === '') return fallback
+  if (value === '*') return Math.max(1, fallback)
+  if (value === '1+*' || value === '2+*' || value.endsWith('+*')) {
+    const base = Number.parseInt(value, 10)
+    return Number.isFinite(base) ? Math.max(1, base + fallback) : fallback
+  }
+  const n = Number.parseInt(value, 10)
+  return Number.isFinite(n) ? n : fallback
+}
+
 /**
- * Estimate power/toughness — local pools omit printed P/T.
- * Uses CMC + keywords so combat can still resolve under normal rules.
+ * Power/toughness for combat. Prefers printed Scryfall stats; falls back to
+ * CMC/keyword heuristics when the pool entry has no P/T.
  */
 export function estimatePowerToughness(card: CardRecord): { power: number; toughness: number } {
   if (!isCreatureCard(card)) return { power: 0, toughness: 0 }
 
   const cmc = Math.max(0, card.cmc)
-  let power = Math.max(1, Math.round(cmc * 0.9))
-  let toughness = Math.max(1, Math.round(cmc * 0.95) || 1)
+  const heuristicPower = Math.max(1, Math.round(cmc * 0.9))
+  const heuristicToughness = Math.max(1, Math.round(cmc * 0.95) || 1)
+
+  const printedPower = card.power ?? card.card_faces?.[0]?.power
+  const printedToughness = card.toughness ?? card.card_faces?.[0]?.toughness
+  if (printedPower != null || printedToughness != null) {
+    return {
+      power: parseStat(printedPower, heuristicPower),
+      toughness: parseStat(printedToughness, heuristicToughness),
+    }
+  }
+
+  let power = heuristicPower
+  let toughness = heuristicToughness
 
   const text = `${card.oracle_text ?? ''} ${card.keywords.join(' ')}`.toLowerCase()
   if (/\bflying\b/.test(text)) power = Math.max(power, 1)
@@ -115,7 +138,6 @@ export function estimatePowerToughness(card: CardRecord): { power: number; tough
     power = Math.min(power, 0)
     toughness = Math.max(toughness, 4)
   }
-  // Commanders skew a bit stronger
   if (/legendary/i.test(card.type_line) && /creature/i.test(card.type_line)) {
     power = Math.max(power, Math.ceil(cmc * 0.85))
     toughness = Math.max(toughness, Math.ceil(cmc * 0.9))
