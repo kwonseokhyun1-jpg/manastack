@@ -9,13 +9,9 @@ public/data/*
 *.local
 
 .vercel
-<<<<<<< HEAD
-.wrangler
-=======
 
 # wrangler files
 .wrangler
 .dev.vars*
 !.dev.vars.example
 !.env.example
->>>>>>> 9c82dbc (Fix Cloudflare Workers CI by adding Wrangler SPA config)
