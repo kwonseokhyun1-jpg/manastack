@@ -52,50 +52,42 @@ function stepLabel(step: GameState['step']): string {
 
 function CardArt({
   card,
-  faceDown,
   dimmed,
   selected,
   onClick,
   badge,
+  ownerTint,
 }: {
-  card?: GameCard
-  faceDown?: boolean
+  card: GameCard
   dimmed?: boolean
   selected?: boolean
   onClick?: () => void
   badge?: string
+  /** Visual owner cue on the shared battlefield */
+  ownerTint?: 'you' | 'opponent'
 }) {
-  if (faceDown || !card) {
-    return (
-      <button
-        type="button"
-        disabled={!onClick}
-        onClick={onClick}
-        className={`relative h-[5.5rem] w-16 shrink-0 rounded-md border border-[var(--color-mtg-border)] bg-gradient-to-br from-[#1a2740] to-[#0d1117] shadow ${
-          onClick ? 'cursor-pointer hover:border-[var(--color-mtg-gold-dim)]' : ''
-        }`}
-        title="Face-down card"
-      >
-        <span className="absolute inset-0 flex items-center justify-center text-[10px] text-[var(--color-mtg-muted)]">
-          MTG
-        </span>
-      </button>
-    )
-  }
+  const border =
+    selected
+      ? 'border-sky-400 ring-2 ring-sky-400'
+      : ownerTint === 'opponent'
+        ? 'border-red-500/50'
+        : ownerTint === 'you'
+          ? 'border-[var(--color-mtg-gold)]/50'
+          : 'border-[var(--color-mtg-border)]'
 
   return (
     <button
       type="button"
       disabled={!onClick}
       onClick={onClick}
-      className={`relative h-[5.5rem] w-16 shrink-0 overflow-hidden rounded-md border shadow transition ${
-        selected
-          ? 'border-sky-400 ring-2 ring-sky-400'
-          : 'border-[var(--color-mtg-border)]'
-      } ${dimmed ? 'opacity-50' : ''} ${
-        card.tapped ? 'rotate-90' : ''
-      } ${onClick ? 'cursor-pointer hover:scale-105' : 'cursor-default'}`}
-      title={`${card.card.name}${card.isCommander ? ' (Commander)' : ''}`}
+      className={`relative h-[5.5rem] w-16 shrink-0 overflow-hidden rounded-md border shadow transition ${border} ${
+        dimmed ? 'opacity-50' : ''
+      } ${card.tapped ? 'rotate-90' : ''} ${
+        onClick ? 'cursor-pointer hover:scale-105' : 'cursor-default'
+      }`}
+      title={`${card.card.name}${card.isCommander ? ' (Commander)' : ''}${
+        ownerTint === 'opponent' ? ' · Opponent' : ownerTint === 'you' ? ' · You' : ''
+      }`}
     >
       {card.card.image ? (
         <img
@@ -119,6 +111,11 @@ function CardArt({
           {badge}
         </span>
       )}
+      {ownerTint === 'opponent' && !badge && (
+        <span className="absolute left-0 top-0 rounded-br bg-red-500/90 px-1 text-[8px] font-bold text-white">
+          OPP
+        </span>
+      )}
       {card.isCommander && (
         <span className="absolute left-0 top-0 h-1.5 w-full bg-[var(--color-mtg-gold)]" />
       )}
@@ -128,17 +125,19 @@ function CardArt({
 
 function PermanentRow({
   cards,
-  hidden,
   selectedUids,
   onSelect,
+  ownerTint,
+  emptyLabel = 'Empty',
 }: {
   cards: GameCard[]
-  hidden?: boolean
   selectedUids?: Set<string>
   onSelect?: (uid: string) => void
+  ownerTint?: 'you' | 'opponent'
+  emptyLabel?: string
 }) {
   if (cards.length === 0) {
-    return <p className="text-xs text-[var(--color-mtg-muted)]">No permanents</p>
+    return <p className="text-xs text-[var(--color-mtg-muted)]">{emptyLabel}</p>
   }
   return (
     <div className="flex flex-wrap gap-2">
@@ -146,7 +145,7 @@ function PermanentRow({
         <CardArt
           key={c.uid}
           card={c}
-          faceDown={hidden}
+          ownerTint={ownerTint}
           selected={selectedUids?.has(c.uid)}
           onClick={onSelect ? () => onSelect(c.uid) : undefined}
         />
@@ -266,8 +265,7 @@ export function PlaytestGame({
             Playtest duel
           </h2>
           <p className="text-sm text-[var(--color-mtg-muted)]">
-            Rules-based 1v1 Commander. Opponent hand/library stay hidden — you only control your
-            own cards.
+            Shared battlefield duel. Opponent hand stays private — you only control your own cards.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -336,54 +334,145 @@ export function PlaytestGame({
         )}
       </div>
 
-      {/* Opponent */}
-      <section className="rounded-xl border border-red-500/30 bg-[var(--color-mtg-panel)]/80 p-4">
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+      {/* Player headers */}
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div className="rounded-xl border border-red-500/30 bg-[var(--color-mtg-panel)]/80 px-4 py-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-red-300">Opponent</p>
+              <h3 className="font-[family-name:var(--font-display)] text-base text-white">
+                {oppDeck.name}
+              </h3>
+              <p className="text-xs text-[var(--color-mtg-muted)]">{bracketLabel}</p>
+            </div>
+            <div className="flex gap-3 text-center">
+              <div>
+                <p className="text-[10px] uppercase text-[var(--color-mtg-muted)]">Life</p>
+                <p className="font-[family-name:var(--font-display)] text-2xl">{opp.life}</p>
+              </div>
+              <div>
+                <p className="text-[10px] uppercase text-[var(--color-mtg-muted)]">Hand</p>
+                <p className="text-xl text-white">{opp.hand.length}</p>
+              </div>
+              <div>
+                <p className="text-[10px] uppercase text-[var(--color-mtg-muted)]">Library</p>
+                <p className="text-xl text-white">{opp.library.length}</p>
+              </div>
+            </div>
+          </div>
+          {opp.command[0] && (
+            <div className="mt-3 flex items-center gap-2">
+              <span className="text-[10px] uppercase text-[var(--color-mtg-muted)]">Command</span>
+              <CardArt card={opp.command[0]} badge="CMD" />
+            </div>
+          )}
+        </div>
+
+        <div className="rounded-xl border border-[var(--color-mtg-gold)]/30 bg-[var(--color-mtg-panel)]/80 px-4 py-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-[var(--color-mtg-gold)]">
+                You
+              </p>
+              <h3 className="font-[family-name:var(--font-display)] text-base text-white">
+                {youDeck.name}
+              </h3>
+            </div>
+            <div className="flex gap-3 text-center">
+              <div>
+                <p className="text-[10px] uppercase text-[var(--color-mtg-muted)]">Life</p>
+                <p className="font-[family-name:var(--font-display)] text-2xl">{you.life}</p>
+              </div>
+              <div>
+                <p className="text-[10px] uppercase text-[var(--color-mtg-muted)]">Library</p>
+                <p className="text-xl text-white">{you.library.length}</p>
+              </div>
+              <div>
+                <p className="text-[10px] uppercase text-[var(--color-mtg-muted)]">GY</p>
+                <p className="text-xl text-white">{you.graveyard.length}</p>
+              </div>
+            </div>
+          </div>
+          {you.command[0] && (
+            <div className="mt-3 flex items-center gap-2">
+              <span className="text-[10px] uppercase text-[var(--color-mtg-muted)]">
+                Command
+                {you.commanderCastCount > 0 ? ` · tax {${you.commanderCastCount * 2}}` : ''}
+              </span>
+              <CardArt
+                card={you.command[0]}
+                badge="CMD"
+                dimmed={!legal.some((a) => a.type === 'cast_commander')}
+                onClick={
+                  legal.some((a) => a.type === 'cast_commander')
+                    ? () => dispatch({ type: 'cast_commander' })
+                    : undefined
+                }
+              />
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Shared battlefield */}
+      <section className="rounded-xl border-2 border-dashed border-[var(--color-mtg-border)] bg-[var(--color-mtg-bg)]/40 p-4">
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--color-mtg-muted)]">
+            Shared battlefield
+          </h3>
+          <p className="text-[10px] text-[var(--color-mtg-muted)]">
+            <span className="text-red-300">Opp</span> ·{' '}
+            <span className="text-[var(--color-mtg-gold)]">You</span>
+          </p>
+        </div>
+
+        <div className="space-y-4">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-red-300">Opponent</p>
-            <h3 className="font-[family-name:var(--font-display)] text-lg text-white">
-              {oppDeck.name}
-            </h3>
-            <p className="text-xs text-[var(--color-mtg-muted)]">{bracketLabel}</p>
+            <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-red-300/80">
+              Opponent
+            </p>
+            <PermanentRow
+              cards={opp.battlefield}
+              ownerTint="opponent"
+              emptyLabel="No opponent permanents"
+            />
           </div>
-          <div className="flex gap-4 text-center">
-            <div>
-              <p className="text-[10px] uppercase text-[var(--color-mtg-muted)]">Life</p>
-              <p className="font-[family-name:var(--font-display)] text-2xl">{opp.life}</p>
-            </div>
-            <div>
-              <p className="text-[10px] uppercase text-[var(--color-mtg-muted)]">Hand</p>
-              <p className="text-xl text-white">{opp.hand.length}</p>
-            </div>
-            <div>
-              <p className="text-[10px] uppercase text-[var(--color-mtg-muted)]">Library</p>
-              <p className="text-xl text-white">{opp.library.length}</p>
-            </div>
+
+          <div className="border-t border-[var(--color-mtg-border)]/60" />
+
+          <div>
+            <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--color-mtg-gold)]/80">
+              You
+            </p>
+            <PermanentRow
+              cards={you.battlefield}
+              ownerTint="you"
+              emptyLabel="No permanents — play lands and cast spells from your hand"
+              selectedUids={
+                game.step === 'combat_attackers'
+                  ? selectedAttackers
+                  : selectedAttackerForBlock
+                    ? new Set(Object.values(blockerPairs))
+                    : undefined
+              }
+              onSelect={
+                game.step === 'combat_attackers' && yourTurn
+                  ? (uid) => {
+                      if (attackable.has(uid)) toggleAttacker(uid)
+                    }
+                  : game.step === 'combat_blockers' && game.priority === 'you'
+                    ? (uid) => onBlockerClick(uid)
+                    : undefined
+              }
+            />
           </div>
         </div>
-
-        <div className="mb-2 flex flex-wrap gap-2">
-          {Array.from({ length: opp.hand.length }).map((_, i) => (
-            <CardArt key={`oh-${i}`} faceDown />
-          ))}
-        </div>
-
-        {opp.command[0] && (
-          <div className="mb-3">
-            <p className="mb-1 text-xs text-[var(--color-mtg-muted)]">Command zone</p>
-            <CardArt card={opp.command[0]} badge="CMD" />
-          </div>
-        )}
-
-        <p className="mb-1 text-xs uppercase text-[var(--color-mtg-muted)]">Battlefield</p>
-        <PermanentRow cards={opp.battlefield} />
       </section>
 
       {/* Combat prompt */}
       {game.step === 'combat_attackers' && yourTurn && (
         <div className="rounded-lg border border-[var(--color-mtg-gold-dim)] bg-[var(--color-mtg-gold)]/10 px-4 py-3 text-sm">
-          Select attackers, then confirm. Creatures with summoning sickness or defender cannot
-          attack.
+          Select your attackers on the battlefield, then confirm.
           <div className="mt-2 flex gap-2">
             <button
               type="button"
@@ -407,7 +496,7 @@ export function PlaytestGame({
 
       {game.step === 'combat_blockers' && game.priority === 'you' && (
         <div className="rounded-lg border border-sky-500/40 bg-sky-500/10 px-4 py-3 text-sm">
-          Choose an attacker, then a blocker. Confirm when done.
+          Choose an attacker, then a blocker on your side of the battlefield.
           <div className="mt-2 flex flex-wrap gap-2">
             {game.combat.map((atk) => {
               const creature = opp.battlefield.find((c) => c.uid === atk.attackerUid)
@@ -441,79 +530,16 @@ export function PlaytestGame({
         </div>
       )}
 
-      {/* You */}
+      {/* Your hand + actions */}
       <section className="rounded-xl border border-[var(--color-mtg-gold)]/30 bg-[var(--color-mtg-panel)]/80 p-4">
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--color-mtg-gold)]">
-              You
-            </p>
-            <h3 className="font-[family-name:var(--font-display)] text-lg text-white">
-              {youDeck.name}
-            </h3>
-          </div>
-          <div className="flex gap-4 text-center">
-            <div>
-              <p className="text-[10px] uppercase text-[var(--color-mtg-muted)]">Life</p>
-              <p className="font-[family-name:var(--font-display)] text-2xl">{you.life}</p>
-            </div>
-            <div>
-              <p className="text-[10px] uppercase text-[var(--color-mtg-muted)]">Library</p>
-              <p className="text-xl text-white">{you.library.length}</p>
-            </div>
-            <div>
-              <p className="text-[10px] uppercase text-[var(--color-mtg-muted)]">GY</p>
-              <p className="text-xl text-white">{you.graveyard.length}</p>
-            </div>
-          </div>
-        </div>
-
-        <p className="mb-1 text-xs uppercase text-[var(--color-mtg-muted)]">Battlefield</p>
-        <PermanentRow
-          cards={you.battlefield}
-          selectedUids={
-            game.step === 'combat_attackers'
-              ? selectedAttackers
-              : selectedAttackerForBlock
-                ? new Set(Object.values(blockerPairs))
-                : undefined
-          }
-          onSelect={
-            game.step === 'combat_attackers' && yourTurn
-              ? (uid) => {
-                  if (attackable.has(uid)) toggleAttacker(uid)
-                }
-              : game.step === 'combat_blockers' && game.priority === 'you'
-                ? (uid) => onBlockerClick(uid)
-                : undefined
-          }
-        />
-
-        {you.command[0] && (
-          <div className="mt-3">
-            <p className="mb-1 text-xs text-[var(--color-mtg-muted)]">
-              Command zone
-              {you.commanderCastCount > 0 ? ` · tax {${you.commanderCastCount * 2}}` : ''}
-            </p>
-            <CardArt
-              card={you.command[0]}
-              badge="CMD"
-              dimmed={!legal.some((a) => a.type === 'cast_commander')}
-              onClick={
-                legal.some((a) => a.type === 'cast_commander')
-                  ? () => dispatch({ type: 'cast_commander' })
-                  : undefined
-              }
-            />
-          </div>
-        )}
-
-        <div className="mt-4">
-          <p className="mb-1 text-xs uppercase text-[var(--color-mtg-muted)]">
-            Hand ({you.hand.length}) — click a land to play or a spell you can afford to cast
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {you.hand.map((card) => {
+        <p className="mb-1 text-xs uppercase text-[var(--color-mtg-muted)]">
+          Your hand ({you.hand.length}) — click a land to play or a spell you can afford
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {you.hand.length === 0 ? (
+            <p className="text-xs text-[var(--color-mtg-muted)]">Empty</p>
+          ) : (
+            you.hand.map((card) => {
               const playable =
                 (isLandCard(card.card) && canPlayLand(game, 'you', card.uid)) ||
                 canCastCard(game, 'you', card.uid)
@@ -529,8 +555,8 @@ export function PlaytestGame({
                   }
                 />
               )
-            })}
-          </div>
+            })
+          )}
         </div>
 
         <div className="mt-4 flex flex-wrap gap-2">
