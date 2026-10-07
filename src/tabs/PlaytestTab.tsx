@@ -1,20 +1,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { PlaytestPlayerBoard } from '../components/PlaytestPlayerBoard'
+import { PlaytestGame } from '../components/PlaytestGame'
 import { loadCommanderRankPool, loadMinigamePool } from '../lib/card-db'
 import { parseDecklistText, parsedToResolved } from '../lib/decklist-parse'
 import { generateBracketOpponentDeck } from '../lib/playtest-brackets'
-import { createPlayerState } from '../lib/playtest-state'
 import type { CardRecord } from '../types/card'
 import type {
   CommanderBracket,
   ParsedDecklist,
-  PlaytestPlayerState,
   ResolvedDeck,
 } from '../types/playtest'
 import { BRACKETS } from '../types/playtest'
 
 type Phase = 'setup' | 'play'
-type FocusSide = 'you' | 'opponent'
 
 const SAMPLE_DECKLIST = `Commander
 1 Atraxa, Praetors' Voice
@@ -33,7 +30,12 @@ Deck
 1 Smothering Tithe
 1 Beast Within
 1 Chaos Warp
-1 Endless One
+1 Birds of Paradise
+1 Llanowar Elves
+1 Sakura-Tribe Elder
+1 Eternal Witness
+1 Mulldrifter
+1 Solemn Simulacrum
 10 Plains
 10 Island
 10 Swamp
@@ -51,9 +53,7 @@ export function PlaytestTab() {
   const [opponentPreview, setOpponentPreview] = useState<ResolvedDeck | null>(null)
   const [youDeck, setYouDeck] = useState<ResolvedDeck | null>(null)
   const [oppDeck, setOppDeck] = useState<ResolvedDeck | null>(null)
-  const [youState, setYouState] = useState<PlaytestPlayerState | null>(null)
-  const [oppState, setOppState] = useState<PlaytestPlayerState | null>(null)
-  const [focus, setFocus] = useState<FocusSide>('you')
+  const [matchKey, setMatchKey] = useState(0)
   const [regenBusy, setRegenBusy] = useState(false)
 
   const allCardsRef = useRef<CardRecord[]>([])
@@ -98,7 +98,7 @@ export function PlaytestTab() {
         setOpponentPreview(deck)
         if (phase === 'play') {
           setOppDeck(deck)
-          setOppState(createPlayerState(deck))
+          setMatchKey((k) => k + 1)
         }
       } finally {
         setRegenBusy(false)
@@ -117,8 +117,7 @@ export function PlaytestTab() {
       setParsed(null)
       return
     }
-    const result = parseDecklistText(text, name)
-    setParsed(result)
+    setParsed(parseDecklistText(text, name))
   }
 
   const onUploadFile = async (file: File) => {
@@ -142,23 +141,8 @@ export function PlaytestTab() {
     setError(null)
     setYouDeck(resolvedYou)
     setOppDeck(opponentPreview)
-    setYouState(createPlayerState(resolvedYou))
-    setOppState(createPlayerState(opponentPreview))
-    setFocus('you')
+    setMatchKey((k) => k + 1)
     setPhase('play')
-  }
-
-  const exitToSetup = () => {
-    setPhase('setup')
-    setYouState(null)
-    setOppState(null)
-  }
-
-  const restartMatch = () => {
-    if (!youDeck || !oppDeck) return
-    setYouState(createPlayerState(youDeck))
-    setOppState(createPlayerState(oppDeck))
-    setFocus('you')
   }
 
   if (loading) {
@@ -169,109 +153,45 @@ export function PlaytestTab() {
     )
   }
 
-  if (phase === 'play' && youState && oppState && youDeck && oppDeck) {
+  if (phase === 'play' && youDeck && oppDeck) {
+    const bracketMeta = BRACKETS.find((b) => b.id === bracket)
     return (
-      <div className="mx-auto flex max-w-5xl flex-col gap-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <button
-              type="button"
-              onClick={exitToSetup}
-              className="text-sm text-[var(--color-mtg-muted)] transition hover:text-[var(--color-mtg-gold)]"
-            >
-              ← Back to deck setup
-            </button>
-            <h2 className="mt-1 font-[family-name:var(--font-display)] text-2xl font-bold text-[var(--color-mtg-gold)]">
-              Playtest
-            </h2>
-            <p className="text-sm text-[var(--color-mtg-muted)]">
-              Control both boards. Shortcuts apply to the focused player (D draw · T next turn · M
-              mulligan).
-            </p>
+      <div className="space-y-3">
+        <div className="flex flex-wrap items-center justify-end gap-2 px-1">
+          <span className="text-xs text-[var(--color-mtg-muted)]">Opponent bracket</span>
+          <div className="flex rounded-lg border border-[var(--color-mtg-border)] p-0.5">
+            {BRACKETS.map((b) => (
+              <button
+                key={b.id}
+                type="button"
+                onClick={() => onBracketChange(b.id)}
+                title={b.title}
+                className={`rounded-md px-2.5 py-1 text-xs font-semibold transition ${
+                  bracket === b.id
+                    ? 'bg-[var(--color-mtg-gold)] text-black'
+                    : 'text-[var(--color-mtg-muted)] hover:text-white'
+                }`}
+              >
+                {b.label}
+              </button>
+            ))}
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <label className="text-xs text-[var(--color-mtg-muted)]">Opponent bracket</label>
-            <div className="flex rounded-lg border border-[var(--color-mtg-border)] p-0.5">
-              {BRACKETS.map((b) => (
-                <button
-                  key={b.id}
-                  type="button"
-                  onClick={() => onBracketChange(b.id)}
-                  title={b.title}
-                  className={`rounded-md px-2.5 py-1 text-xs font-semibold transition ${
-                    bracket === b.id
-                      ? 'bg-[var(--color-mtg-gold)] text-black'
-                      : 'text-[var(--color-mtg-muted)] hover:text-white'
-                  }`}
-                >
-                  {b.label}
-                </button>
-              ))}
-            </div>
-            <button
-              type="button"
-              disabled={regenBusy}
-              onClick={() => regenerateOpponent()}
-              className="rounded-lg border border-[var(--color-mtg-border)] px-3 py-1.5 text-xs text-[var(--color-mtg-muted)] hover:text-white disabled:opacity-50"
-            >
-              New opponent
-            </button>
-            <button
-              type="button"
-              onClick={restartMatch}
-              className="rounded-lg border border-red-500/40 px-3 py-1.5 text-xs text-red-300"
-            >
-              Restart
-            </button>
-          </div>
+          <button
+            type="button"
+            disabled={regenBusy}
+            onClick={() => regenerateOpponent()}
+            className="rounded-lg border border-[var(--color-mtg-border)] px-3 py-1.5 text-xs text-[var(--color-mtg-muted)] hover:text-white disabled:opacity-50"
+          >
+            Reroll opponent
+          </button>
         </div>
-
-        <div className="flex gap-2">
-          {(
-            [
-              { id: 'opponent' as const, label: 'Focus opponent' },
-              { id: 'you' as const, label: 'Focus you' },
-            ] as const
-          ).map((opt) => (
-            <button
-              key={opt.id}
-              type="button"
-              onClick={() => setFocus(opt.id)}
-              className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
-                focus === opt.id
-                  ? 'bg-[var(--color-mana-u)]/30 text-sky-200'
-                  : 'border border-[var(--color-mtg-border)] text-[var(--color-mtg-muted)]'
-              }`}
-            >
-              {opt.label}
-            </button>
-          ))}
-        </div>
-
-        <PlaytestPlayerBoard
-          side="opponent"
-          label="Opponent"
-          deckName={oppDeck.name}
-          subtitle={`Bracket ${bracket} · ${BRACKETS.find((b) => b.id === bracket)?.title}`}
-          state={oppState}
-          onChange={setOppState}
-          accent="#d3202a"
-          shortcutsActive={focus === 'opponent'}
-        />
-
-        <PlaytestPlayerBoard
-          side="you"
-          label="You"
-          deckName={youDeck.name}
-          subtitle={
-            youDeck.commander
-              ? `Commander: ${youDeck.commander.name}`
-              : `${youDeck.mainboard.length} cards`
-          }
-          state={youState}
-          onChange={setYouState}
-          accent="var(--color-mtg-gold)"
-          shortcutsActive={focus === 'you'}
+        <PlaytestGame
+          key={matchKey}
+          youDeck={youDeck}
+          oppDeck={oppDeck}
+          bracketLabel={`Bracket ${bracket} · ${bracketMeta?.title ?? ''}`}
+          onExit={() => setPhase('setup')}
+          onNewOpponent={() => regenerateOpponent()}
         />
       </div>
     )
@@ -284,7 +204,8 @@ export function PlaytestTab() {
           Playtest
         </h2>
         <p className="mt-1 text-sm text-[var(--color-mtg-muted)]">
-          Upload or paste a decklist, pick an opponent power bracket, and goldfish both boards.
+          Upload a decklist and duel an AI opponent from a power bracket — hidden hand, legal
+          turns, combat, and commander rules.
         </p>
       </div>
 
@@ -449,7 +370,7 @@ export function PlaytestTab() {
         onClick={startPlaytest}
         className="rounded-xl bg-[var(--color-mtg-gold)] py-3 text-sm font-semibold text-black transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
       >
-        Start playtest
+        Start duel
       </button>
       {!canStart && deckText.trim() && (
         <p className="text-center text-xs text-[var(--color-mtg-muted)]">
