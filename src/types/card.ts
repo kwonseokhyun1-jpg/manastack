@@ -8,6 +8,10 @@ export type CardFace = {
   oracle_text: string
   mana_cost?: string
   image?: string
+  /** Printed power (creatures); may be "*" / "1+*" */
+  power?: string
+  /** Printed toughness (creatures); may be "*" / "1+*" */
+  toughness?: string
 }
 
 export type CardRecord = {
@@ -28,6 +32,10 @@ export type CardRecord = {
   prices?: { usd?: string | null; usd_foil?: string | null }
   rarity?: CardRarity
   card_faces?: CardFace[]
+  /** Printed power when known (from Scryfall oracle data). */
+  power?: string
+  /** Printed toughness when known (from Scryfall oracle data). */
+  toughness?: string
 }
 
 export type CardDatabase = {
