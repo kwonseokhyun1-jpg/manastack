@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { ResolvedDeck } from '../types/playtest'
-import type { GameAction, GameCard, GameState, PlayerId } from '../types/playtest-game'
+import type { GameAction, GameCard, GameState } from '../types/playtest-game'
 import { runAiUntilHumanPriority } from '../lib/playtest-ai'
 import {
   applyAction,
@@ -25,24 +25,16 @@ function stepLabel(step: GameState['step']): string {
   switch (step) {
     case 'mulligan':
       return 'Mulligan'
-    case 'untap':
-      return 'Untap'
-    case 'upkeep':
-      return 'Upkeep'
-    case 'draw':
-      return 'Draw'
     case 'main1':
-      return 'Main phase 1'
+      return 'Main 1'
     case 'combat_attackers':
-      return 'Declare attackers'
+      return 'Attackers'
     case 'combat_blockers':
-      return 'Declare blockers'
+      return 'Blockers'
     case 'combat_damage':
-      return 'Combat damage'
+      return 'Damage'
     case 'main2':
-      return 'Main phase 2'
-    case 'end':
-      return 'End step'
+      return 'Main 2'
     case 'game_over':
       return 'Game over'
     default:
@@ -50,44 +42,39 @@ function stepLabel(step: GameState['step']): string {
   }
 }
 
-function CardArt({
+function CardTile({
   card,
   dimmed,
   selected,
   onClick,
-  badge,
-  ownerTint,
+  size = 'md',
+  showPt = true,
 }: {
   card: GameCard
   dimmed?: boolean
   selected?: boolean
   onClick?: () => void
-  badge?: string
-  /** Visual owner cue on the shared battlefield */
-  ownerTint?: 'you' | 'opponent'
+  size?: 'sm' | 'md' | 'hand'
+  showPt?: boolean
 }) {
-  const border =
-    selected
-      ? 'border-sky-400 ring-2 ring-sky-400'
-      : ownerTint === 'opponent'
-        ? 'border-red-500/50'
-        : ownerTint === 'you'
-          ? 'border-[var(--color-mtg-gold)]/50'
-          : 'border-[var(--color-mtg-border)]'
+  const sizeClass =
+    size === 'hand'
+      ? 'h-[7.25rem] w-[5.15rem] sm:h-32 sm:w-24'
+      : size === 'sm'
+        ? 'h-[4.5rem] w-12'
+        : 'h-[5.75rem] w-16'
 
   return (
     <button
       type="button"
       disabled={!onClick}
       onClick={onClick}
-      className={`relative h-[5.5rem] w-16 shrink-0 overflow-hidden rounded-md border shadow transition ${border} ${
-        dimmed ? 'opacity-50' : ''
-      } ${card.tapped ? 'rotate-90' : ''} ${
-        onClick ? 'cursor-pointer hover:scale-105' : 'cursor-default'
+      className={`relative shrink-0 overflow-hidden rounded-md border bg-black shadow-md transition ${sizeClass} ${
+        selected ? 'border-sky-400 ring-2 ring-sky-400' : 'border-black/60'
+      } ${dimmed ? 'opacity-45' : ''} ${card.tapped ? 'rotate-90' : ''} ${
+        onClick ? 'cursor-pointer hover:-translate-y-0.5 hover:brightness-110' : 'cursor-default'
       }`}
-      title={`${card.card.name}${card.isCommander ? ' (Commander)' : ''}${
-        ownerTint === 'opponent' ? ' · Opponent' : ownerTint === 'you' ? ' · You' : ''
-      }`}
+      title={card.card.name}
     >
       {card.card.image ? (
         <img
@@ -97,59 +84,61 @@ function CardArt({
           draggable={false}
         />
       ) : (
-        <span className="flex h-full items-center justify-center bg-[var(--color-mtg-bg)] p-1 text-center text-[8px]">
+        <span className="flex h-full items-center justify-center bg-[#1c2128] p-1 text-center text-[8px] text-white">
           {card.card.name}
         </span>
       )}
-      {isCreatureCard(card.card) && (
-        <span className="absolute bottom-0 right-0 rounded-tl bg-black/80 px-1 text-[9px] text-white">
+      {showPt && isCreatureCard(card.card) && (
+        <span className="absolute bottom-0 right-0 rounded-tl bg-black/85 px-1 text-[9px] font-semibold text-white">
           {card.power}/{card.toughness}
         </span>
       )}
-      {badge && (
-        <span className="absolute left-0 top-0 rounded-br bg-[var(--color-mtg-gold)] px-1 text-[8px] font-bold text-black">
-          {badge}
-        </span>
-      )}
-      {ownerTint === 'opponent' && !badge && (
-        <span className="absolute left-0 top-0 rounded-br bg-red-500/90 px-1 text-[8px] font-bold text-white">
-          OPP
-        </span>
-      )}
       {card.isCommander && (
-        <span className="absolute left-0 top-0 h-1.5 w-full bg-[var(--color-mtg-gold)]" />
+        <span className="absolute left-0 top-0 h-1 w-full bg-[var(--color-mtg-gold)]" />
       )}
     </button>
   )
 }
 
-function PermanentRow({
-  cards,
-  selectedUids,
-  onSelect,
-  ownerTint,
-  emptyLabel = 'Empty',
-}: {
-  cards: GameCard[]
-  selectedUids?: Set<string>
-  onSelect?: (uid: string) => void
-  ownerTint?: 'you' | 'opponent'
-  emptyLabel?: string
-}) {
-  if (cards.length === 0) {
-    return <p className="text-xs text-[var(--color-mtg-muted)]">{emptyLabel}</p>
-  }
+function CardBack({ label }: { label?: string }) {
   return (
-    <div className="flex flex-wrap gap-2">
-      {cards.map((c) => (
-        <CardArt
-          key={c.uid}
-          card={c}
-          ownerTint={ownerTint}
-          selected={selectedUids?.has(c.uid)}
-          onClick={onSelect ? () => onSelect(c.uid) : undefined}
-        />
-      ))}
+    <div
+      className="relative h-[7.25rem] w-[5.15rem] shrink-0 overflow-hidden rounded-md border border-black/50 shadow-md sm:h-32 sm:w-24"
+      title={label}
+    >
+      <div className="playtest-card-back h-full w-full" />
+    </div>
+  )
+}
+
+function ZoneMenu({
+  label,
+  count,
+  open,
+  onToggle,
+  children,
+}: {
+  label: string
+  count: number
+  open: boolean
+  onToggle: () => void
+  children: ReactNode
+}) {
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={onToggle}
+        className="flex items-center gap-1 text-xs font-medium text-[#c8cdd3] hover:text-white"
+      >
+        {label} ({count})
+        <span className="text-[10px] text-[#8b949e]">{open ? '▴' : '▾'}</span>
+      </button>
+      {open && (
+        <div className="absolute bottom-full left-0 z-20 mb-2 max-h-56 min-w-[12rem] overflow-y-auto rounded-lg border border-[#30363d] bg-[#161b22] p-2 shadow-xl">
+          {children}
+        </div>
+      )}
     </div>
   )
 }
@@ -165,8 +154,10 @@ export function PlaytestGame({
   const [selectedAttackers, setSelectedAttackers] = useState<Set<string>>(new Set())
   const [blockerPairs, setBlockerPairs] = useState<Record<string, string>>({})
   const [selectedAttackerForBlock, setSelectedAttackerForBlock] = useState<string | null>(null)
+  const [showZones, setShowZones] = useState(false)
+  const [actionsOpen, setActionsOpen] = useState(false)
+  const [openZone, setOpenZone] = useState<'gy' | 'exile' | 'command' | null>(null)
 
-  // When it's the opponent's priority, run AI
   useEffect(() => {
     if (game.winner) return
     if (game.step === 'mulligan') return
@@ -177,7 +168,7 @@ export function PlaytestGame({
       setSelectedAttackers(new Set())
       setBlockerPairs({})
       setSelectedAttackerForBlock(null)
-    }, 450)
+    }, 500)
     return () => window.clearTimeout(timer)
   }, [game])
 
@@ -192,9 +183,8 @@ export function PlaytestGame({
       }
       return next
     })
-    if (action.type !== 'declare_attackers') {
-      setSelectedAttackers(new Set())
-    }
+    if (action.type !== 'declare_attackers') setSelectedAttackers(new Set())
+    setActionsOpen(false)
   }
 
   const onHandClick = (card: GameCard) => {
@@ -218,16 +208,10 @@ export function PlaytestGame({
     })
   }
 
-  const confirmAttackers = () => {
-    dispatch({ type: 'declare_attackers', attackerUids: [...selectedAttackers] })
-    setSelectedAttackers(new Set())
-  }
-
   const onBlockerClick = (blockerUid: string) => {
     if (!selectedAttackerForBlock) return
     setBlockerPairs((prev) => {
       const next = { ...prev }
-      // Remove if this blocker already assigned
       for (const [atk, blk] of Object.entries(next)) {
         if (blk === blockerUid) delete next[atk]
       }
@@ -236,257 +220,247 @@ export function PlaytestGame({
     })
   }
 
-  const confirmBlockers = () => {
-    const blocks = Object.entries(blockerPairs).map(([attackerUid, blockerUid]) => ({
-      attackerUid,
-      blockerUid,
-    }))
-    dispatch({ type: 'declare_blockers', blocks })
-    setBlockerPairs({})
-    setSelectedAttackerForBlock(null)
-  }
-
   const you = game.players.you
   const opp = game.players.opponent
   const attackable = new Set(legalAttackers(you).map((c) => c.uid))
+  const oppThinking = game.priority === 'opponent' && !game.winner && game.step !== 'mulligan'
 
   return (
-    <div className="mx-auto flex max-w-5xl flex-col gap-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
+    <div className="fixed inset-0 z-[80] flex flex-col bg-[#14181c] text-[#e6edf3]">
+      {/* Top bar — Moxfield-style */}
+      <header className="flex shrink-0 items-center gap-2 border-b border-black/40 bg-[#1c2128] px-2 py-1.5 sm:px-3">
+        <div className="flex items-center gap-1 rounded-md bg-black/30 px-1.5 py-1">
+          <span className="text-[10px] font-semibold uppercase text-red-300">Opp</span>
+          <span className="min-w-[1.75rem] text-center font-[family-name:var(--font-display)] text-lg font-bold text-white">
+            {opp.life}
+          </span>
+        </div>
+
+        <div className="flex items-center gap-1 rounded-md bg-black/30 px-1.5 py-1">
+          <span className="text-sm text-[var(--color-mtg-gold)]" aria-hidden>
+            ✦
+          </span>
+          <span className="min-w-[1.75rem] text-center font-[family-name:var(--font-display)] text-lg font-bold">
+            {you.life}
+          </span>
+        </div>
+
+        <div className="hidden text-xs text-[#8b949e] sm:block">
+          {oppDeck.name.split('(')[0].trim()}
+          <span className="mx-1">·</span>
+          {bracketLabel}
+        </div>
+
+        <div className="ml-auto flex items-center gap-2 text-xs">
+          <span className="rounded bg-black/35 px-2 py-1 text-[#c8cdd3]">
+            Turn {game.turn}
+            <span className="mx-1 text-[#8b949e]">·</span>
+            {stepLabel(game.step)}
+          </span>
+          {oppThinking && (
+            <span className="animate-pulse text-[11px] text-sky-300">Opponent acting…</span>
+          )}
+          {game.winner && (
+            <span className="font-semibold text-[var(--color-mtg-gold)]">
+              {game.winner === 'you' ? 'You win!' : 'Opponent wins'}
+            </span>
+          )}
           <button
             type="button"
             onClick={onExit}
-            className="text-sm text-[var(--color-mtg-muted)] transition hover:text-[var(--color-mtg-gold)]"
+            className="flex h-8 w-8 items-center justify-center rounded text-[#8b949e] hover:bg-white/10 hover:text-white"
+            aria-label="Exit playtest"
           >
-            ← Back to deck setup
+            ✕
           </button>
-          <h2 className="mt-1 font-[family-name:var(--font-display)] text-2xl font-bold text-[var(--color-mtg-gold)]">
-            Playtest duel
-          </h2>
-          <p className="text-sm text-[var(--color-mtg-muted)]">
-            Shared battlefield duel. Opponent hand stays private — you only control your own cards.
-          </p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={onNewOpponent}
-            className="rounded-lg border border-[var(--color-mtg-border)] px-3 py-1.5 text-xs text-[var(--color-mtg-muted)] hover:text-white"
-          >
-            New opponent ({bracketLabel})
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setGame(createGame(youDeck, oppDeck))
-              setSelectedAttackers(new Set())
-              setBlockerPairs({})
-            }}
-            className="rounded-lg border border-red-500/40 px-3 py-1.5 text-xs text-red-300"
-          >
-            Rematch
-          </button>
-          {game.step !== 'game_over' && (
+      </header>
+
+      {/* Menu row */}
+      <div className="relative flex shrink-0 items-center gap-3 border-b border-black/30 bg-[#1c2128]/70 px-3 py-1.5 text-xs">
+        <button
+          type="button"
+          onClick={() => setActionsOpen((v) => !v)}
+          className="text-[#c8cdd3] hover:text-white"
+        >
+          Actions ▾
+        </button>
+        <span className="text-[#8b949e]">
+          Mana {manaPoolLabel(you.mana)}
+        </span>
+        <span className="ml-auto text-[#8b949e]">
+          {game.activePlayer === 'you' ? 'Your turn' : "Opponent's turn"}
+        </span>
+
+        {actionsOpen && (
+          <div className="absolute left-3 top-full z-30 mt-1 min-w-[10rem] rounded-lg border border-[#30363d] bg-[#161b22] py-1 shadow-xl">
+            {(game.step === 'main1' || game.step === 'main2') && game.priority === 'you' && (
+              <button
+                type="button"
+                className="block w-full px-3 py-2 text-left hover:bg-white/5"
+                onClick={() => dispatch({ type: 'pass' })}
+              >
+                {game.step === 'main1' ? 'Go to combat' : 'End turn'}
+              </button>
+            )}
+            {legal.some((a) => a.type === 'cast_commander') && (
+              <button
+                type="button"
+                className="block w-full px-3 py-2 text-left hover:bg-white/5"
+                onClick={() => dispatch({ type: 'cast_commander' })}
+              >
+                Cast commander
+              </button>
+            )}
             <button
               type="button"
-              onClick={() => dispatch({ type: 'concede' })}
-              className="rounded-lg border border-[var(--color-mtg-border)] px-3 py-1.5 text-xs text-[var(--color-mtg-muted)]"
+              className="block w-full px-3 py-2 text-left hover:bg-white/5"
+              onClick={() => {
+                setGame(createGame(youDeck, oppDeck))
+                setSelectedAttackers(new Set())
+                setBlockerPairs({})
+                setActionsOpen(false)
+              }}
             >
-              Concede
+              Rematch
             </button>
-          )}
-        </div>
-      </div>
-
-      {/* Status bar */}
-      <div className="flex flex-wrap items-center gap-3 rounded-xl border border-[var(--color-mtg-border)] bg-[var(--color-mtg-panel)] px-4 py-3 text-sm">
-        <span>
-          Turn <span className="text-[var(--color-mtg-gold)]">{game.turn}</span>
-        </span>
-        <span className="text-[var(--color-mtg-muted)]">·</span>
-        <span>
-          Active:{' '}
-          <span className="text-white">
-            {game.players[game.activePlayer as PlayerId].name === you.name &&
-            game.activePlayer === 'you'
-              ? 'You'
-              : game.activePlayer === 'you'
-                ? 'You'
-                : 'Opponent'}
-          </span>
-        </span>
-        <span className="text-[var(--color-mtg-muted)]">·</span>
-        <span>
-          Step: <span className="text-sky-300">{stepLabel(game.step)}</span>
-        </span>
-        <span className="text-[var(--color-mtg-muted)]">·</span>
-        <span>
-          Mana: <span className="text-[var(--color-mtg-gold)]">{manaPoolLabel(you.mana)}</span>
-        </span>
-        {game.winner && (
-          <>
-            <span className="text-[var(--color-mtg-muted)]">·</span>
-            <span className="font-semibold text-[var(--color-mtg-gold)]">
-              {game.winner === 'you' ? 'You win!' : 'Opponent wins.'} {game.winReason}
-            </span>
-          </>
+            <button
+              type="button"
+              className="block w-full px-3 py-2 text-left hover:bg-white/5"
+              onClick={() => {
+                onNewOpponent()
+                setActionsOpen(false)
+              }}
+            >
+              New opponent
+            </button>
+            {game.step !== 'game_over' && (
+              <button
+                type="button"
+                className="block w-full px-3 py-2 text-left text-red-300 hover:bg-white/5"
+                onClick={() => dispatch({ type: 'concede' })}
+              >
+                Concede
+              </button>
+            )}
+          </div>
         )}
       </div>
 
-      {/* Player headers */}
-      <div className="grid gap-3 sm:grid-cols-2">
-        <div className="rounded-xl border border-red-500/30 bg-[var(--color-mtg-panel)]/80 px-4 py-3">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-red-300">Opponent</p>
-              <h3 className="font-[family-name:var(--font-display)] text-base text-white">
-                {oppDeck.name}
-              </h3>
-              <p className="text-xs text-[var(--color-mtg-muted)]">{bracketLabel}</p>
-            </div>
-            <div className="flex gap-3 text-center">
-              <div>
-                <p className="text-[10px] uppercase text-[var(--color-mtg-muted)]">Life</p>
-                <p className="font-[family-name:var(--font-display)] text-2xl">{opp.life}</p>
-              </div>
-              <div>
-                <p className="text-[10px] uppercase text-[var(--color-mtg-muted)]">Hand</p>
-                <p className="text-xl text-white">{opp.hand.length}</p>
-              </div>
-              <div>
-                <p className="text-[10px] uppercase text-[var(--color-mtg-muted)]">Library</p>
-                <p className="text-xl text-white">{opp.library.length}</p>
-              </div>
-            </div>
+      {/* Battlefield */}
+      <div className="playtest-battlefield relative min-h-0 flex-1 overflow-hidden">
+        {/* Opponent half */}
+        <div className="absolute inset-x-0 top-0 flex h-1/2 flex-col border-b border-white/5 px-2 pb-1 pt-2 sm:px-4">
+          <div className="mb-1 flex items-center justify-between text-[10px] uppercase tracking-wide text-[#8b949e]">
+            <span>
+              Opponent · Hand {opp.hand.length} · Library {opp.library.length}
+            </span>
+            {opp.command[0] && (
+              <span className="normal-case text-[#c8cdd3]">
+                Cmd: {opp.command[0].card.name}
+              </span>
+            )}
           </div>
-          {opp.command[0] && (
-            <div className="mt-3 flex items-center gap-2">
-              <span className="text-[10px] uppercase text-[var(--color-mtg-muted)]">Command</span>
-              <CardArt card={opp.command[0]} badge="CMD" />
-            </div>
-          )}
+          <div className="flex min-h-0 flex-1 flex-wrap content-start gap-2 overflow-y-auto">
+            {opp.battlefield.length === 0 ? (
+              <p className="m-auto text-xs text-[#5c6570]">Opponent battlefield</p>
+            ) : (
+              opp.battlefield.map((c) => <CardTile key={c.uid} card={c} />)
+            )}
+          </div>
         </div>
 
-        <div className="rounded-xl border border-[var(--color-mtg-gold)]/30 bg-[var(--color-mtg-panel)]/80 px-4 py-3">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-[var(--color-mtg-gold)]">
-                You
-              </p>
-              <h3 className="font-[family-name:var(--font-display)] text-base text-white">
-                {youDeck.name}
-              </h3>
-            </div>
-            <div className="flex gap-3 text-center">
-              <div>
-                <p className="text-[10px] uppercase text-[var(--color-mtg-muted)]">Life</p>
-                <p className="font-[family-name:var(--font-display)] text-2xl">{you.life}</p>
-              </div>
-              <div>
-                <p className="text-[10px] uppercase text-[var(--color-mtg-muted)]">Library</p>
-                <p className="text-xl text-white">{you.library.length}</p>
-              </div>
-              <div>
-                <p className="text-[10px] uppercase text-[var(--color-mtg-muted)]">GY</p>
-                <p className="text-xl text-white">{you.graveyard.length}</p>
-              </div>
-            </div>
+        {/* Your half */}
+        <div className="absolute inset-x-0 bottom-0 flex h-1/2 flex-col px-2 pb-2 pt-1 sm:px-4">
+          <div className="mb-1 flex items-center justify-between text-[10px] uppercase tracking-wide text-[#8b949e]">
+            <span>You</span>
+            {you.command[0] && (
+              <button
+                type="button"
+                disabled={!legal.some((a) => a.type === 'cast_commander')}
+                onClick={() => dispatch({ type: 'cast_commander' })}
+                className="normal-case text-[var(--color-mtg-gold)] disabled:text-[#5c6570]"
+              >
+                Cast {you.command[0].card.name}
+                {you.commanderCastCount > 0 ? ` (+${you.commanderCastCount * 2})` : ''}
+              </button>
+            )}
           </div>
-          {you.command[0] && (
-            <div className="mt-3 flex items-center gap-2">
-              <span className="text-[10px] uppercase text-[var(--color-mtg-muted)]">
-                Command
-                {you.commanderCastCount > 0 ? ` · tax {${you.commanderCastCount * 2}}` : ''}
-              </span>
-              <CardArt
-                card={you.command[0]}
-                badge="CMD"
-                dimmed={!legal.some((a) => a.type === 'cast_commander')}
-                onClick={
-                  legal.some((a) => a.type === 'cast_commander')
-                    ? () => dispatch({ type: 'cast_commander' })
-                    : undefined
-                }
-              />
-            </div>
-          )}
+          <div className="flex min-h-0 flex-1 flex-wrap content-start gap-2 overflow-y-auto">
+            {you.battlefield.length === 0 ? (
+              <p className="m-auto text-xs text-[#5c6570]">Your battlefield</p>
+            ) : (
+              you.battlefield.map((c) => (
+                <CardTile
+                  key={c.uid}
+                  card={c}
+                  selected={
+                    selectedAttackers.has(c.uid) ||
+                    Object.values(blockerPairs).includes(c.uid)
+                  }
+                  onClick={
+                    game.step === 'combat_attackers' && yourTurn && attackable.has(c.uid)
+                      ? () => toggleAttacker(c.uid)
+                      : game.step === 'combat_blockers' && game.priority === 'you'
+                        ? () => onBlockerClick(c.uid)
+                        : undefined
+                  }
+                />
+              ))
+            )}
+          </div>
         </div>
+
+        <button
+          type="button"
+          onClick={() => setShowZones((v) => !v)}
+          className="absolute bottom-2 right-3 z-10 text-xs text-[#8b949e] underline-offset-2 hover:text-white hover:underline"
+        >
+          {showZones ? 'Hide Other Zones' : 'Show Other Zones'}
+        </button>
       </div>
 
-      {/* Shared battlefield */}
-      <section className="rounded-xl border-2 border-dashed border-[var(--color-mtg-border)] bg-[var(--color-mtg-bg)]/40 p-4">
-        <div className="mb-3 flex items-center justify-between gap-2">
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--color-mtg-muted)]">
-            Shared battlefield
-          </h3>
-          <p className="text-[10px] text-[var(--color-mtg-muted)]">
-            <span className="text-red-300">Opp</span> ·{' '}
-            <span className="text-[var(--color-mtg-gold)]">You</span>
-          </p>
-        </div>
-
-        <div className="space-y-4">
-          <div>
-            <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-red-300/80">
-              Opponent
-            </p>
-            <PermanentRow
-              cards={opp.battlefield}
-              ownerTint="opponent"
-              emptyLabel="No opponent permanents"
-            />
-          </div>
-
-          <div className="border-t border-[var(--color-mtg-border)]/60" />
-
-          <div>
-            <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--color-mtg-gold)]/80">
-              You
-            </p>
-            <PermanentRow
-              cards={you.battlefield}
-              ownerTint="you"
-              emptyLabel="No permanents — play lands and cast spells from your hand"
-              selectedUids={
-                game.step === 'combat_attackers'
-                  ? selectedAttackers
-                  : selectedAttackerForBlock
-                    ? new Set(Object.values(blockerPairs))
-                    : undefined
-              }
-              onSelect={
-                game.step === 'combat_attackers' && yourTurn
-                  ? (uid) => {
-                      if (attackable.has(uid)) toggleAttacker(uid)
-                    }
-                  : game.step === 'combat_blockers' && game.priority === 'you'
-                    ? (uid) => onBlockerClick(uid)
-                    : undefined
-              }
-            />
-          </div>
-        </div>
-      </section>
-
-      {/* Combat prompt */}
-      {game.step === 'combat_attackers' && yourTurn && (
-        <div className="rounded-lg border border-[var(--color-mtg-gold-dim)] bg-[var(--color-mtg-gold)]/10 px-4 py-3 text-sm">
-          Select your attackers on the battlefield, then confirm.
-          <div className="mt-2 flex gap-2">
+      {/* Combat / mulligan prompts */}
+      {game.step === 'mulligan' && (
+        <div className="shrink-0 border-t border-black/40 bg-[#1c2128] px-3 py-2">
+          <p className="mb-2 text-sm text-[#c8cdd3]">Keep or mulligan your opening hand.</p>
+          <div className="flex gap-2">
             <button
               type="button"
-              onClick={confirmAttackers}
+              onClick={() => dispatch({ type: 'keep_hand' })}
+              className="rounded bg-[var(--color-mtg-gold)] px-4 py-2 text-sm font-semibold text-black"
+            >
+              Keep hand
+            </button>
+            <button
+              type="button"
+              onClick={() => dispatch({ type: 'mulligan' })}
+              className="rounded border border-[#30363d] px-4 py-2 text-sm"
+            >
+              Mulligan
+            </button>
+          </div>
+        </div>
+      )}
+
+      {game.step === 'combat_attackers' && yourTurn && (
+        <div className="shrink-0 border-t border-[var(--color-mtg-gold)]/30 bg-[#1c2128] px-3 py-2">
+          <p className="mb-2 text-sm text-[#c8cdd3]">Select attackers, then confirm.</p>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                dispatch({ type: 'declare_attackers', attackerUids: [...selectedAttackers] })
+                setSelectedAttackers(new Set())
+              }}
               className="rounded bg-[var(--color-mtg-gold)] px-3 py-1.5 text-sm font-semibold text-black"
             >
               Attack{selectedAttackers.size ? ` (${selectedAttackers.size})` : ' with none'}
             </button>
             <button
               type="button"
-              onClick={() => {
-                setSelectedAttackers(new Set(attackable))
-              }}
-              className="rounded border border-[var(--color-mtg-border)] px-3 py-1.5 text-sm"
+              onClick={() => setSelectedAttackers(new Set(attackable))}
+              className="rounded border border-[#30363d] px-3 py-1.5 text-sm"
             >
               Select all
             </button>
@@ -495,9 +469,11 @@ export function PlaytestGame({
       )}
 
       {game.step === 'combat_blockers' && game.priority === 'you' && (
-        <div className="rounded-lg border border-sky-500/40 bg-sky-500/10 px-4 py-3 text-sm">
-          Choose an attacker, then a blocker on your side of the battlefield.
-          <div className="mt-2 flex flex-wrap gap-2">
+        <div className="shrink-0 border-t border-sky-500/30 bg-[#1c2128] px-3 py-2">
+          <p className="mb-2 text-sm text-[#c8cdd3]">
+            Choose an attacker, then tap one of your creatures to block.
+          </p>
+          <div className="mb-2 flex flex-wrap gap-2">
             {game.combat.map((atk) => {
               const creature = opp.battlefield.find((c) => c.uid === atk.attackerUid)
               if (!creature) return null
@@ -509,7 +485,7 @@ export function PlaytestGame({
                   className={`rounded border px-2 py-1 text-xs ${
                     selectedAttackerForBlock === atk.attackerUid
                       ? 'border-sky-400 text-sky-200'
-                      : 'border-[var(--color-mtg-border)]'
+                      : 'border-[#30363d]'
                   }`}
                 >
                   Block {creature.card.name}
@@ -522,85 +498,140 @@ export function PlaytestGame({
           </div>
           <button
             type="button"
-            onClick={confirmBlockers}
-            className="mt-2 rounded bg-[var(--color-mtg-gold)] px-3 py-1.5 text-sm font-semibold text-black"
+            onClick={() => {
+              dispatch({
+                type: 'declare_blockers',
+                blocks: Object.entries(blockerPairs).map(([attackerUid, blockerUid]) => ({
+                  attackerUid,
+                  blockerUid,
+                })),
+              })
+              setBlockerPairs({})
+              setSelectedAttackerForBlock(null)
+            }}
+            className="rounded bg-[var(--color-mtg-gold)] px-3 py-1.5 text-sm font-semibold text-black"
           >
             Confirm blockers
           </button>
         </div>
       )}
 
-      {/* Your hand + actions */}
-      <section className="rounded-xl border border-[var(--color-mtg-gold)]/30 bg-[var(--color-mtg-panel)]/80 p-4">
-        <p className="mb-1 text-xs uppercase text-[var(--color-mtg-muted)]">
-          Your hand ({you.hand.length}) — click a land to play or a spell you can afford
-        </p>
-        <div className="flex flex-wrap gap-2">
-          {you.hand.length === 0 ? (
-            <p className="text-xs text-[var(--color-mtg-muted)]">Empty</p>
-          ) : (
-            you.hand.map((card) => {
-              const playable =
-                (isLandCard(card.card) && canPlayLand(game, 'you', card.uid)) ||
-                canCastCard(game, 'you', card.uid)
-              return (
-                <CardArt
-                  key={card.uid}
-                  card={card}
-                  dimmed={game.priority === 'you' && !playable && game.step !== 'mulligan'}
-                  onClick={
-                    game.priority === 'you' && game.step !== 'mulligan'
-                      ? () => onHandClick(card)
-                      : undefined
-                  }
-                />
-              )
-            })
-          )}
+      {(game.step === 'main1' || game.step === 'main2') && game.priority === 'you' && (
+        <div className="flex shrink-0 justify-end border-t border-black/30 bg-[#1c2128]/80 px-3 py-1.5">
+          <button
+            type="button"
+            onClick={() => dispatch({ type: 'pass' })}
+            className="rounded bg-[var(--color-mtg-gold)] px-4 py-1.5 text-sm font-semibold text-black"
+          >
+            {game.step === 'main1' ? 'Go to combat' : 'End turn'}
+          </button>
         </div>
+      )}
 
-        <div className="mt-4 flex flex-wrap gap-2">
-          {game.step === 'mulligan' && (
-            <>
-              <button
-                type="button"
-                onClick={() => dispatch({ type: 'keep_hand' })}
-                className="rounded-lg bg-[var(--color-mtg-gold)] px-4 py-2 text-sm font-semibold text-black"
-              >
-                Keep hand
-              </button>
-              <button
-                type="button"
-                onClick={() => dispatch({ type: 'mulligan' })}
-                className="rounded-lg border border-[var(--color-mtg-border)] px-4 py-2 text-sm"
-              >
-                Mulligan
-              </button>
-            </>
-          )}
-          {(game.step === 'main1' || game.step === 'main2') && game.priority === 'you' && (
-            <button
-              type="button"
-              onClick={() => dispatch({ type: 'pass' })}
-              className="rounded-lg bg-[var(--color-mtg-gold)] px-4 py-2 text-sm font-semibold text-black"
+      {/* Other zones drawer */}
+      {showZones && (
+        <div className="shrink-0 border-t border-black/40 bg-[#1c2128] px-3 py-2">
+          <div className="flex flex-wrap gap-4">
+            <ZoneMenu
+              label="Graveyard"
+              count={you.graveyard.length}
+              open={openZone === 'gy'}
+              onToggle={() => setOpenZone((z) => (z === 'gy' ? null : 'gy'))}
             >
-              {game.step === 'main1' ? 'Go to combat' : 'End turn'}
-            </button>
-          )}
+              {you.graveyard.length === 0 ? (
+                <p className="px-1 text-xs text-[#8b949e]">Empty</p>
+              ) : (
+                <div className="flex flex-wrap gap-1">
+                  {you.graveyard.map((c) => (
+                    <CardTile key={c.uid} card={c} size="sm" showPt={false} />
+                  ))}
+                </div>
+              )}
+            </ZoneMenu>
+            <ZoneMenu
+              label="Exile"
+              count={you.exile.length}
+              open={openZone === 'exile'}
+              onToggle={() => setOpenZone((z) => (z === 'exile' ? null : 'exile'))}
+            >
+              {you.exile.length === 0 ? (
+                <p className="px-1 text-xs text-[#8b949e]">Empty</p>
+              ) : (
+                <div className="flex flex-wrap gap-1">
+                  {you.exile.map((c) => (
+                    <CardTile key={c.uid} card={c} size="sm" showPt={false} />
+                  ))}
+                </div>
+              )}
+            </ZoneMenu>
+            <ZoneMenu
+              label="Command"
+              count={you.command.length}
+              open={openZone === 'command'}
+              onToggle={() => setOpenZone((z) => (z === 'command' ? null : 'command'))}
+            >
+              {you.command.length === 0 ? (
+                <p className="px-1 text-xs text-[#8b949e]">On battlefield</p>
+              ) : (
+                <div className="flex flex-wrap gap-1">
+                  {you.command.map((c) => (
+                    <CardTile
+                      key={c.uid}
+                      card={c}
+                      size="sm"
+                      onClick={
+                        legal.some((a) => a.type === 'cast_commander')
+                          ? () => dispatch({ type: 'cast_commander' })
+                          : undefined
+                      }
+                    />
+                  ))}
+                </div>
+              )}
+            </ZoneMenu>
+            <div className="text-xs text-[#8b949e]">
+              Opp GY {opp.graveyard.length} · Opp exile {opp.exile.length}
+            </div>
+          </div>
         </div>
-      </section>
+      )}
 
-      {/* Log */}
-      <section className="max-h-48 overflow-y-auto rounded-xl border border-[var(--color-mtg-border)] bg-[var(--color-mtg-bg)]/60 p-3">
-        <p className="mb-2 text-xs font-semibold uppercase text-[var(--color-mtg-muted)]">
-          Game log
-        </p>
-        <ul className="space-y-1 text-xs text-[var(--color-mtg-muted)]">
-          {[...game.log].reverse().map((e) => (
-            <li key={e.id}>• {e.text}</li>
-          ))}
-        </ul>
-      </section>
+      {/* Bottom: Hand + Library */}
+      <footer className="shrink-0 border-t border-black/50 bg-[#1c2128] px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 sm:px-4">
+        <div className="flex items-end gap-3">
+          <div className="min-w-0 flex-1">
+            <p className="mb-1 text-xs font-medium text-[#c8cdd3]">
+              Hand ({you.hand.length})
+            </p>
+            <div className="flex gap-1.5 overflow-x-auto pb-1">
+              {you.hand.map((card) => {
+                const playable =
+                  (isLandCard(card.card) && canPlayLand(game, 'you', card.uid)) ||
+                  canCastCard(game, 'you', card.uid)
+                return (
+                  <CardTile
+                    key={card.uid}
+                    card={card}
+                    size="hand"
+                    dimmed={game.priority === 'you' && !playable && game.step !== 'mulligan'}
+                    onClick={
+                      game.priority === 'you' && game.step !== 'mulligan'
+                        ? () => onHandClick(card)
+                        : undefined
+                    }
+                  />
+                )
+              })}
+            </div>
+          </div>
+          <div className="shrink-0 text-center">
+            <p className="mb-1 text-xs font-medium text-[#c8cdd3]">
+              Library ({you.library.length})
+            </p>
+            <CardBack label={`${you.library.length} cards`} />
+          </div>
+        </div>
+      </footer>
     </div>
   )
 }

@@ -156,44 +156,14 @@ export function PlaytestTab() {
   if (phase === 'play' && youDeck && oppDeck) {
     const bracketMeta = BRACKETS.find((b) => b.id === bracket)
     return (
-      <div className="space-y-3">
-        <div className="flex flex-wrap items-center justify-end gap-2 px-1">
-          <span className="text-xs text-[var(--color-mtg-muted)]">Opponent bracket</span>
-          <div className="flex rounded-lg border border-[var(--color-mtg-border)] p-0.5">
-            {BRACKETS.map((b) => (
-              <button
-                key={b.id}
-                type="button"
-                onClick={() => onBracketChange(b.id)}
-                title={b.title}
-                className={`rounded-md px-2.5 py-1 text-xs font-semibold transition ${
-                  bracket === b.id
-                    ? 'bg-[var(--color-mtg-gold)] text-black'
-                    : 'text-[var(--color-mtg-muted)] hover:text-white'
-                }`}
-              >
-                {b.label}
-              </button>
-            ))}
-          </div>
-          <button
-            type="button"
-            disabled={regenBusy}
-            onClick={() => regenerateOpponent()}
-            className="rounded-lg border border-[var(--color-mtg-border)] px-3 py-1.5 text-xs text-[var(--color-mtg-muted)] hover:text-white disabled:opacity-50"
-          >
-            Reroll opponent
-          </button>
-        </div>
-        <PlaytestGame
-          key={matchKey}
-          youDeck={youDeck}
-          oppDeck={oppDeck}
-          bracketLabel={`Bracket ${bracket} · ${bracketMeta?.title ?? ''}`}
-          onExit={() => setPhase('setup')}
-          onNewOpponent={() => regenerateOpponent()}
-        />
-      </div>
+      <PlaytestGame
+        key={matchKey}
+        youDeck={youDeck}
+        oppDeck={oppDeck}
+        bracketLabel={`Bracket ${bracket} · ${bracketMeta?.title ?? ''}`}
+        onExit={() => setPhase('setup')}
+        onNewOpponent={() => regenerateOpponent()}
+      />
     )
   }
 
@@ -204,8 +174,8 @@ export function PlaytestTab() {
           Playtest
         </h2>
         <p className="mt-1 text-sm text-[var(--color-mtg-muted)]">
-          Upload a decklist and duel an AI opponent from a power bracket — hidden hand, legal
-          turns, combat, and commander rules.
+          Upload a decklist and duel on a shared playtest table — the AI opponent plays the far
+          side each turn.
         </p>
       </div>
 
