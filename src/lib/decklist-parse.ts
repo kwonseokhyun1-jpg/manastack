@@ -43,17 +43,27 @@ function isLegendaryCreature(card: CardRecord): boolean {
   return /Legendary/i.test(card.type_line) && /Creature/i.test(card.type_line)
 }
 
+export type ParseDecklistOptions = {
+  /** Explicit commander name (separate UI field). Wins over decklist sections. */
+  commanderName?: string
+}
+
 /**
  * Parse a pasted or uploaded decklist (Arena / MTGO / plain `1 Card Name` text).
  * Requires the card name index to be initialized (`loadMinigamePool` / `loadCardDatabase`).
  */
-export function parseDecklistText(text: string, deckName = 'My Deck'): ParsedDecklist {
+export function parseDecklistText(
+  text: string,
+  deckName = 'My Deck',
+  options?: ParseDecklistOptions,
+): ParsedDecklist {
   const lines = text.split(/\r?\n/)
   const cards: DeckEntry[] = []
   const unresolved: string[] = []
   let commander: DeckEntry | undefined
   let section: 'main' | 'commander' | 'side' = 'main'
   let inferredName = deckName
+  const overrideCommander = cleanCardName(options?.commanderName ?? '')
 
   for (const rawLine of lines) {
     const line = rawLine.trim()
@@ -89,8 +99,11 @@ export function parseDecklistText(text: string, deckName = 'My Deck'): ParsedDec
     const entry = resolveEntry(name, quantity)
 
     if (section === 'commander') {
-      commander = { ...entry, quantity: 1 }
-      if (entry.unresolved) unresolved.push(entry.name)
+      // Explicit UI commander field takes precedence; skip inline commander lines.
+      if (!overrideCommander) {
+        commander = { ...entry, quantity: 1 }
+        if (entry.unresolved) unresolved.push(entry.name)
+      }
       continue
     }
 
@@ -98,7 +111,14 @@ export function parseDecklistText(text: string, deckName = 'My Deck'): ParsedDec
     if (entry.unresolved) unresolved.push(entry.name)
   }
 
-  if (!commander) {
+  if (overrideCommander) {
+    commander = resolveEntry(overrideCommander, 1)
+    if (commander.unresolved) unresolved.push(commander.name)
+    // Keep commander out of the 99 if it was also listed in the mainboard.
+    const cmdKey = overrideCommander.toLowerCase()
+    const idx = cards.findIndex((c) => c.name.toLowerCase() === cmdKey)
+    if (idx >= 0) cards.splice(idx, 1)
+  } else if (!commander) {
     const legendary = cards.find(
       (c) => c.card && isLegendaryCreature(c.card) && c.quantity === 1,
     )
@@ -119,6 +139,32 @@ export function parseDecklistText(text: string, deckName = 'My Deck'): ParsedDec
     unresolved: [...new Set(unresolved)],
     totalCards,
   }
+}
+
+/** Drop Commander / Sideboard section bodies so the textarea stores the 99 only. */
+export function extractMainboardText(text: string): string {
+  const lines = text.split(/\r?\n/)
+  const out: string[] = []
+  let skip = false
+  for (const line of lines) {
+    const trimmed = line.trim()
+    if (SECTION_COMMANDER.test(trimmed)) {
+      skip = true
+      continue
+    }
+    if (SECTION_MAIN.test(trimmed)) {
+      skip = false
+      out.push(line)
+      continue
+    }
+    if (SECTION_SIDE.test(trimmed)) {
+      skip = true
+      continue
+    }
+    if (!skip) out.push(line)
+  }
+  const result = out.join('\n').trim()
+  return result || text
 }
 
 export function expandDeckEntries(entries: DeckEntry[]): CardRecord[] {
